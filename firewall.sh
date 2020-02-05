@@ -209,7 +209,7 @@ Unload_IPSets () {
 
 
 Domain_Lookup () {
-		set -o pipefail; nslookup "$1" $(nvram get dhcp_dns1_x) 2>/dev/null | grep -oE '[1-9][0-9]{0,2}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk 'NR>2'
+		set -o pipefail; nslookup "$1" 2>/dev/null | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk 'NR>2'
 		if [ $? -ne 0 ]; then
 			logger -st Skynet "[*] DNS lookup failed for $1"
 			touch "$errorlogfile"; echo "$(date) | DNS lookup failed | $1" >> "$errorlogfile"
@@ -394,7 +394,7 @@ Load_Set () {
 
 
 Download_Set () {
-		echo "$blacklist_set" | Filter_URL_Line | while IFS= read -r "line"; do
+		echo "$blacklist_set" | Filter_URL_Line | while IFS= read -r line; do
 			url=$(echo "$line" | Filter_URL)
 			comment=$(echo "$line" | Filter_Comment)
 			update_cycles=$(echo "$line" | Filter_Update_Cycles)
@@ -583,4 +583,4 @@ esac
 
 echo
 echo "Uptime: $(File_Age "$installtime")"
-if [ -f "$errorlogfile" ] && [ $(wc -l < "$errorlogfile") -ge 1 ]; then echo "Last error: $(File_Age "$errorlogfile")"; fi
+if [ -f "$errorlogfile" ] && [ $(wc -l < "$errorlogfile") -ge 1 ] && [ $(($(date +%s) - $(date +%s -r "$errorlogfile"))) -lt 86400 ]; then echo "Error in last 24 hours: $(File_Age "$errorlogfile")"; fi
