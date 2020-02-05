@@ -498,7 +498,7 @@ if [ "$command" = "reset" ] || ! ipset list -n Skynet-Master >/dev/null 2>&1 || 
 fi
 
 
-IP=$(echo "$command" | Is_IP)
+ip=$(echo "$command" | Is_IP) || ip="noip"
 case "$command" in
 		"update")
 			if [ "$option" = "cru" ]; then
@@ -543,18 +543,18 @@ case "$command" in
 		;;
 
 
-		"$IP")
+		"$ip")
 			echo "-----------------------------------------------------------"
-			echo " Search for $IP"
+			echo " Search for $ip"
 			echo "-----------------------------------------------------------"
-			if ipset -q test "Skynet-Whitelist" "$IP"; then
+			if ipset -q test "Skynet-Whitelist" "$ip"; then
 				echo " [*] whitelist"
 			else
 				echo " [ ] whitelist"
 			fi
 			lookup=$(ipset list Skynet-Master | Filter_Skynet | tr -d '"' | awk '{print $1, $7}')
 			for setname in $(echo "$lookup" | sort -k2 | awk '{print $1}'); do
-				if ipset -q test "$setname" "$IP"; then
+				if ipset -q test "$setname" "$ip"; then
 					echo " [*] $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
 				else
 					echo " [ ] $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
@@ -579,6 +579,7 @@ case "$command" in
 			ipset list Skynet-Master | Filter_Skynet | tr -d '"' | sort -k3,3gr -k7,7 | awk '{printf " %-40s  %15s\n", $7, $3}'
 		;;
 esac
+
 
 echo
 echo "Uptime: $(File_Age "$installtime")"
