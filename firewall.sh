@@ -96,7 +96,7 @@ if [ $ntptimer -ge 300 ]; then
 fi
 
 
-if [ "$command" = "update" ]; then
+if [ "$command" = "update" ] || [ "$command" = "reset" ] || ! ipset list -n Skynet-Master >/dev/null 2>&1; then
 		for i in 1 2 3 4 5 6; do
 			if ping -q -w1 -c1 google.com >/dev/null 2>&1; then break; fi
 			if ping -q -w1 -c1 github.com >/dev/null 2>&1; then break; fi
@@ -459,7 +459,7 @@ echo "* Code based on Skynet By Adamm"
 echo
 
 
-if [ "$command" = "reset" ] || ! ipset list -n Skynet-Master >/dev/null 2>&1 || ! ipset list -n Skynet-Whitelist >/dev/null 2>&1; then
+if [ "$command" = "reset" ] || ! ipset list -n Skynet-Master >/dev/null 2>&1; then
 		logger -st Skynet "[i] Install"
 		touch "$installtime"
 		touch "$errorlogfile"
@@ -484,14 +484,14 @@ if [ "$command" = "reset" ] || ! ipset list -n Skynet-Master >/dev/null 2>&1 || 
 		Unload_IPTables
 		Unload_LogIPTables
 		Unload_IPSets
-		ipset create Skynet-Master list:set size 64 comment counters
-		ipset create Skynet-Whitelist hash:net hashsize 64 comment
-		ipset create Skynet-Blacklist hash:net hashsize 64 comment
-		ipset create Skynet-Domain hash:net hashsize 64 comment
-		ipset create Skynet-ASN hash:net hashsize 64 comment
-		ipset add Skynet-Master Skynet-Blacklist comment "blacklist_ip/cidr"
-		ipset add Skynet-Master Skynet-Domain comment "blacklist_domain"
-		ipset add Skynet-Master Skynet-ASN comment "blacklist_asn"
+		echo 'create Skynet-Master list:set size 64 comment counters
+		create Skynet-Whitelist hash:net hashsize 64 comment
+		create Skynet-Blacklist hash:net hashsize 64 comment
+		create Skynet-Domain hash:net hashsize 64 comment
+		create Skynet-ASN hash:net hashsize 64 comment
+		add Skynet-Master Skynet-Blacklist comment "blacklist_ip/cidr"
+		add Skynet-Master Skynet-Domain comment "blacklist_domain"
+		add Skynet-Master Skynet-ASN comment "blacklist_asn"' | tr -d '\t' | ipset restore -!
 		Load_IPTables
 		Load_LogIPTables
 		command="update"
