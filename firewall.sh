@@ -25,7 +25,9 @@
 # Readme:
 # The cron job is started every 15 minutes
 # By default the blacklist_set update process is started after 4 cycles = 1 hour
-# This value can be overruled per set with {n}
+# This value can be overruled per set with the {n} tag
+# In case of a download error, this set is temporarily set to 1 cycle until a successful download
+#
 # Both the <comment> and {n} tag are optional
 # The order of the url and tags are not important, but need to be on the same line
 #
@@ -470,6 +472,7 @@ if [ "$command" = "reset" ] || ! ipset list -n Skynet-Master >/dev/null 2>&1; th
 		touch "$installtime"
 		touch "$errorlogfile"
 		echo 0 > "$updatecountfile"
+		rm -f "$retrydir"/*
 		if [ "$0" != "/jffs/scripts/firewall" ]; then
 			mv -f "$0" "/jffs/scripts/firewall"
 			logger -st Skynet "[*] Skynet Lite moved to /jffs/scripts/firewall"
