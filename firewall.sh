@@ -393,7 +393,6 @@ Load_Set () {
 		< "$file" Filter_IP_CIDR | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' | ipset restore -!
 		ipset swap "$setname" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
-		rm -f "$retrydir/$setname"
 }
 
 
@@ -421,10 +420,13 @@ Download_Set () {
 			if response_code=$(curl -fsL --retry 4 $url --output "$tempfile" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 				mv -f "$tempfile" "$file"
 				Load_Set "$setname" "$comment"
+				rm -f "$retrydir/$setname"
 			elif [ "$response_code" = "304" ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
 				Load_Set "$setname" "$comment"
+				rm -f "$retrydir/$setname"
 			elif [ "$response_code" = "304" ]; then
 				logger -st Skynet "[-] Fresh $comment"
+				rm -f "$retrydir/$setname"
 			else
 				logger -st Skynet "[*] Download error $url"
 				touch "$errorlogfile"; echo "$(date) | Download error | $response_code | $url" >> "$errorlogfile"
