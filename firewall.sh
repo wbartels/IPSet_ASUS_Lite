@@ -76,11 +76,12 @@ updatecount=0
 
 skynetdir="/tmp/skynet"
 cachedir="$skynetdir/cache"
+retrydir="$skynetdir/retry"
 tempfile="$skynetdir/temp"
 errorlogfile="$skynetdir/error.log"
 installtime="$skynetdir/installtime"
 updatecountfile="$skynetdir/updatecount"
-mkdir -p "$cachedir"
+mkdir -p "$cachedir" "$retrydir"
 
 
 ntptimer=0
@@ -301,7 +302,7 @@ File_Age () {
 
 
 Load_Whitelist () {
-		[ $((updatecount % 25)) -ne 0 ] && return
+		[ $((updatecount % 32)) -ne 0 ] && return
 		logger -st Skynet "[i] Update whitelist"
 		echo -n "" > "$tempfile"
 		echo "add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback_ipaddr\"
@@ -341,7 +342,7 @@ Load_Blacklist () {
 
 
 Load_Domain () {
-		[ $((updatecount % 26)) -ne 0 ] && return
+		[ $((updatecount % 32)) -ne 0 ] && return
 		logger -st Skynet "[i] Update blacklist_domain"
 		echo -n "" > "$tempfile"
 		for domain in $(echo "$blacklist_domain" | Filter_Domain); do
@@ -359,11 +360,11 @@ Load_Domain () {
 
 
 Load_ASN () {
-		[ $((updatecount % 27)) -ne 0 ] && return
+		[ $((updatecount % 32)) -ne 0 ] && return
 		logger -st Skynet "[i] Update blacklist_asn"
 		echo -n "" > "$tempfile"
 		for asn in $(echo "$blacklist_asn" | Filter_ASN); do
-			curl -fsL --retry 3 "https://ipinfo.io/$asn" | Filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$tempfile" &
+			curl -fsL --retry 4 "https://ipinfo.io/$asn" | Filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$tempfile" &
 			n=$((n + 1)); [ $((n % 25)) -eq 0 ] && wait
 		done
 		wait
@@ -390,6 +391,7 @@ Load_Set () {
 		< "$file" Filter_IP_CIDR | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' | ipset restore -!
 		ipset swap "$setname" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
+		rm -f "$retrydir/$setname"
 }
 
 
@@ -398,6 +400,7 @@ Download_Set () {
 			url=$(echo "$line" | Filter_URL)
 			comment=$(echo "$line" | Filter_Comment)
 			update_cycles=$(echo "$line" | Filter_Update_Cycles)
+			setname="Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
 
 			if [ -z "$comment" ]; then
 				comment=$(basename "$url")
@@ -405,13 +408,15 @@ Download_Set () {
 			if [ -z "$update_cycles" ]; then
 				update_cycles=4
 			fi
+			if [ -f "$retrydir/$setname" ]; then
+				update_cycles=1
+			fi
 			if [ $((updatecount % update_cycles)) -ne 0 ]; then
 				continue
 			fi
 
-			setname="Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
 			file="$cachedir/$setname"
-			if response_code=$(curl -fsL --retry 5 $url --output "$tempfile" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
+			if response_code=$(curl -fsL --retry 4 $url --output "$tempfile" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 				mv -f "$tempfile" "$file"
 				Load_Set "$setname" "$comment"
 			elif [ "$response_code" = "304" ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
@@ -421,6 +426,7 @@ Download_Set () {
 			else
 				logger -st Skynet "[*] Download error $url"
 				touch "$errorlogfile"; echo "$(date) | Download error | $response_code | $url" >> "$errorlogfile"
+				touch "$retrydir/$setname"
 			fi
 		done
 
@@ -583,4 +589,3 @@ esac
 
 echo
 echo "Uptime: $(File_Age "$installtime")"
-if [ -f "$errorlogfile" ] && [ $(wc -l < "$errorlogfile") -ge 1 ] && [ $(($(date +%s) - $(date +%s -r "$errorlogfile"))) -lt 86400 ]; then echo "Error in last 24 hours: $(File_Age "$errorlogfile")"; fi
