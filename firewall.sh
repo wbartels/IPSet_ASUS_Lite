@@ -1,4 +1,9 @@
 #!/bin/sh
+#  ___ _                 _     _    _ _
+# / __| |___  _ _ _  ___| |_  | |  (_) |_ ___
+# \__ \ / / || | ' \/ -_)  _| | |__| |  _/ -_)
+# |___/_\_\\_, |_||_\___|\__| |____|_|\__\___|
+#          |__/
 #
 #   Skynet Lite by Willem Bartels
 #   IP Blocking For ASUS Routers Using IPSet
@@ -465,8 +470,9 @@ Download_Set () {
 
 
 clear
-echo "* Skynet Lite by Willem Bartels"
-echo "* Code based on Skynet By Adamm"
+sed -n '2,7s/#//p' "$0"
+echo " Skynet Lite by Willem Bartels"
+echo " Code based on Skynet By Adamm"
 echo
 
 
@@ -592,5 +598,5 @@ case "$command" in
 esac
 
 
-echo
-echo "Uptime: $(File_Age "$installtime")"
+echo "-----------------------------------------------------------"
+printf " %-25s  %30s\n\n" "Uptime $(File_Age "$installtime")" "$(ls -1 "$retrydir" | Filter_Skynet_Set | wc -l) failed downloads pending"
