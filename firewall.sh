@@ -446,14 +446,15 @@ Download_Set () {
 				logger -st Skynet "[*] Unload $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
 				ipset -q del "Skynet-Master" "$setname"
 				ipset -q destroy "$setname"
-				rm -f "$cachedir/$setname"
 			fi
 		done
-		cd "$cachedir"
-		for setname in $(ls -1t); do
-			if ! echo "$list" | grep -q "$setname"; then
-				rm -f "$cachedir/$setname"
-			fi
+		for dir in "$cachedir" "$retrydir"; do
+			cd "$dir"
+			for setname in $(ls -1t); do
+				if ! echo "$list" | grep -q "$setname"; then
+					rm -f "$cachedir/$setname"
+				fi
+			done
 		done
 }
 
@@ -474,7 +475,6 @@ if [ "$command" = "reset" ] || ! ipset list -n Skynet-Master >/dev/null 2>&1; th
 		touch "$installtime"
 		touch "$errorlogfile"
 		echo 0 > "$updatecountfile"
-		rm -f "$retrydir"/*
 		if [ "$0" != "/jffs/scripts/firewall" ]; then
 			mv -f "$0" "/jffs/scripts/firewall"
 			logger -st Skynet "[*] Skynet Lite moved to /jffs/scripts/firewall"
