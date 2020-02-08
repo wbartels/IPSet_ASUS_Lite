@@ -517,20 +517,6 @@ fi
 
 ip=$(echo "$command" | Is_IP) || ip="noip"
 case "$command" in
-		"update")
-			if [ "$option" = "cru" ]; then
-				updatecount=$(head -1 "$updatecountfile" 2>/dev/null)
-				updatecount=$((updatecount + 1))
-				echo "$updatecount" > "$updatecountfile"
-			fi
-			Load_Whitelist
-			Load_Blacklist
-			Load_Domain
-			Load_ASN
-			Download_Set
-		;;
-
-
 		"uninstall")
 			logger -st Skynet "[*] Uninstall Skynet Lite"
 			if [ -f "/jffs/scripts/firewall-start" ]; then
@@ -545,6 +531,33 @@ case "$command" in
 			rm -fr "$skynetdir"
 			rm -f "$lockfile" "$0"
 			echo; exit 0;
+		;;
+
+
+		"error")
+			if [ -f "$errorlogfile" ] && [ $(wc -l < "$errorlogfile") -ge 1 ]; then
+				cat "$errorlogfile"
+			else
+				echo "Empty error log"
+			fi
+			echo; exit 0;
+		;;
+
+
+		"update")
+			echo "-----------------------------------------------------------"
+			echo " Update                                                    "
+			echo "-----------------------------------------------------------"
+			if [ "$option" = "cru" ]; then
+				updatecount=$(head -1 "$updatecountfile" 2>/dev/null)
+				updatecount=$((updatecount + 1))
+				echo "$updatecount" > "$updatecountfile"
+			fi
+			Load_Whitelist
+			Load_Blacklist
+			Load_Domain
+			Load_ASN
+			Download_Set
 		;;
 
 
@@ -580,15 +593,6 @@ case "$command" in
 		;;
 
 
-		"error")
-			if [ -f "$errorlogfile" ] && [ $(wc -l < "$errorlogfile") -ge 1 ]; then
-				cat "$errorlogfile"
-			else
-				echo "Empty error log"
-			fi
-		;;
-
-
 		*)
 			echo "-----------------------------------------------------------"
 			echo " Blacklist                                         Blocked "
@@ -599,4 +603,4 @@ esac
 
 
 echo "-----------------------------------------------------------"
-printf " %-25s  %30s\n\n" "Uptime $(File_Age "$installtime")" "$(ls -1 "$retrydir" | Filter_Skynet_Set | wc -l) failed downloads pending"
+printf " %-25s  %30s\n\n" "Uptime $(File_Age "$installtime")" "$(n=$(ls -1 "$retrydir" | Filter_Skynet_Set | wc -l); [ $n -eq 1 ] && echo "1 failed download pending"; [ $n -ge 2 ] && echo "$n failed downloads pending")"
