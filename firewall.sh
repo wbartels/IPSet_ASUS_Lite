@@ -452,7 +452,7 @@ Download_Set () {
 			cd "$dir"
 			for setname in $(ls -1t); do
 				if ! echo "$list" | grep -q "$setname"; then
-					rm -f "$cachedir/$setname"
+					rm -f "$dir/$setname"
 				fi
 			done
 		done
