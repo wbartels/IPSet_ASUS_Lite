@@ -35,7 +35,7 @@
 # Both the <comment> and {n} tag are optional.
 # The order of the url and tags are not important, but need to be on the same line.
 #
-# The other lists (ip, domain and ASN) can contain multiple items per line.
+# The other lists (ip, domain and asn) can contain multiple items per line.
 # The items on these lists can be separated with a space, tab or newline.
 #
 
