@@ -93,17 +93,12 @@ file_errorlog="$dir_skynet/error.log"
 mkdir -p "$dir_cache" "$dir_retry" "$dir_system"
 
 
-ntptimer=0
-while [ "$(nvram get ntp_ready)" = "0" ] && [ $ntptimer -lt 300 ]; do
-		if [ $ntptimer -eq 0 ]; then logger -st Skynet "[i] Initialize"; fi
-		if [ $ntptimer -eq 60 ]; then logger -st Skynet "[*] Waiting for NTP to sync..."; fi
-		ntptimer=$((ntptimer + 1))
-		sleep 1
+i=0
+while [ "$(nvram get ntp_ready)" = "0" ]; do
+		if [ $i -eq 0 ]; then logger -st Skynet "[i] Waiting for NTP to sync..."; fi
+		if [ $i -eq 300 ]; then logger -st Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!"; echo; exit 1; fi
+		i=$((i + 1)); sleep 1
 done
-if [ $ntptimer -ge 300 ]; then
-		logger -st Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!";
-		echo; exit 1;
-fi
 
 
 if [ "$command" = "update" ] || [ "$command" = "reset" ] || ! ipset list -n Skynet-Master >/dev/null 2>&1; then
@@ -120,6 +115,7 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ] || ! ipset list -n Skyn
 			sleep 7
 		done
 fi
+unset i
 
 
 if [ "$command" = "update" ] && [ "$option" = "cru" ] && [ $(($(date +%s) % 60)) -lt 10 ]; then
@@ -375,7 +371,7 @@ Load_ASN () {
 		echo -n "" > "$file_temp"
 		for asn in $(echo "$blacklist_asn" | Filter_ASN); do
 			(
-				set -o pipefail; curl -fsL --retry 3 "https://ipinfo.io/$asn" | Filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$file_temp"
+				set -o pipefail; curl -fsL --retry 4 "https://ipinfo.io/$asn" | Filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$file_temp"
 				if [ $? -ne 0 ]; then
 					logger -st Skynet "[*] Download error https://ipinfo.io/$asn"
 					touch "$file_errorlog"; echo "$(date) | Download error | https://ipinfo.io/$asn" >> "$file_errorlog"
