@@ -99,6 +99,7 @@ while [ "$(nvram get ntp_ready)" = "0" ]; do
 		if [ $i -eq 300 ]; then logger -st Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!"; echo; exit 1; fi
 		i=$((i + 1)); sleep 1
 done
+if [ ! -f "$file_installtime" ]; then logger -st Skynet "[i] NTP sync time $i seconds"; fi
 
 
 if [ "$command" = "update" ] || [ "$command" = "reset" ] || ! ipset list -n Skynet-Master >/dev/null 2>&1; then
