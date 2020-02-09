@@ -28,13 +28,15 @@
 # firewall uninstall
 #
 # Readme:
-# The cron job is started every 15 minutes
-# By default the blacklist_set update process is started after 4 cycles = 1 hour
-# This value can be overruled per set with the {n} tag
-# In case of a download error, this set is temporarily set to 1 cycle until a successful download
+# The cron job is started every 15 minutes.
+# By default the set update process is started after 4 cycles = 1 hour.
+# This value can be overruled per set with the {n} tag.
+# In case of a download error, this set is temporarily fixed to 1 cycle until a successful download.
+# Both the <comment> and {n} tag are optional.
+# The order of the url and tags are not important, but need to be on the same line.
 #
-# Both the <comment> and {n} tag are optional
-# The order of the url and tags are not important, but need to be on the same line
+# The other lists (ip, domain and ASN) can contain multiple items per line.
+# The items on these lists can be separated with a space, tab or newline.
 #
 
 
@@ -99,7 +101,6 @@ while [ "$(nvram get ntp_ready)" = "0" ]; do
 		if [ $i -eq 300 ]; then logger -st Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!"; echo; exit 1; fi
 		i=$((i + 1)); sleep 1
 done
-if [ ! -f "$file_installtime" ]; then logger -st Skynet "[i] NTP sync time $i seconds"; fi
 
 
 if [ "$command" = "update" ] || [ "$command" = "reset" ] || ! ipset list -n Skynet-Master >/dev/null 2>&1; then
@@ -116,7 +117,6 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ] || ! ipset list -n Skyn
 			sleep 7
 		done
 fi
-unset i
 
 
 if [ "$command" = "update" ] && [ "$option" = "cru" ] && [ $(($(date +%s) % 60)) -lt 10 ]; then
