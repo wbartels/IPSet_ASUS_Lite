@@ -81,14 +81,16 @@ command="$1"
 option="$2"
 updatecount=0
 
-skynetdir="/tmp/skynet"
-cachedir="$skynetdir/cache"
-retrydir="$skynetdir/retry"
-tempfile="$skynetdir/temp"
-errorlogfile="$skynetdir/error.log"
-installtime="$skynetdir/installtime"
-updatecountfile="$skynetdir/updatecount"
-mkdir -p "$cachedir" "$retrydir"
+dir_skynet="/tmp/skynet"
+dir_cache="$dir_skynet/cache"
+dir_retry="$dir_skynet/retry"
+dir_system="$dir_skynet/system"
+file_retryasn="$dir_system/retryasn"
+file_temp="$dir_system/temp"
+file_installtime="$dir_system/installtime"
+file_updatecount="$dir_system/updatecount"
+file_errorlog="$dir_skynet/error.log"
+mkdir -p "$dir_cache" "$dir_retry" "$dir_system"
 
 
 ntptimer=0
@@ -112,7 +114,7 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ] || ! ipset list -n Skyn
 			if [ $i -eq 1 ]; then logger -st Skynet "[*] Waiting for internet connectivity..."; fi
 			if [ $i -eq 6 ]; then
 				logger -st Skynet "[*] Internet connectivity error"
-				touch "$errorlogfile"; echo "$(date) | Internet connectivity error" >> "$errorlogfile"
+				touch "$file_errorlog"; echo "$(date) | Internet connectivity error" >> "$file_errorlog"
 				echo; exit 1
 			fi
 			sleep 7
@@ -220,7 +222,7 @@ Domain_Lookup () {
 		set -o pipefail; nslookup "$1" 2>/dev/null | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk 'NR>2'
 		if [ $? -ne 0 ]; then
 			logger -st Skynet "[*] DNS lookup failed for $1"
-			touch "$errorlogfile"; echo "$(date) | DNS lookup failed | $1" >> "$errorlogfile"
+			touch "$file_errorlog"; echo "$(date) | DNS lookup failed | $1" >> "$file_errorlog"
 		fi
 }
 
@@ -309,9 +311,9 @@ File_Age () {
 
 
 Load_Whitelist () {
-		[ $((updatecount % 32)) -ne 0 ] && return
+		[ $((updatecount % 48)) -ne 0 ] && return
 		logger -st Skynet "[i] Update whitelist"
-		echo -n "" > "$tempfile"
+		echo -n "" > "$file_temp"
 		echo "add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback_ipaddr\"
 		add Skynet-Temp $(LAN_CIDR_Lookup $(nvram get lan_ipaddr)) comment \"Whitelist: lan_ipaddr\"
 		add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Whitelist: wan0_ipaddr\"
@@ -319,18 +321,18 @@ Load_Whitelist () {
 		add Skynet-Temp $(nvram get wan0_dns | awk '{print $1}') comment \"Whitelist: wan0_dns\"
 		add Skynet-Temp $(nvram get wan0_dns | awk '{print $2}') comment \"Whitelist: wan0_dns\"
 		add Skynet-Temp $(nvram get dhcp_dns1_x) comment \"Whitelist: dhcp_dns1_x\"
-		add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"" | tr -d '\t' | Filter_IP_Line >> "$tempfile"
-		echo "$whitelist_ip" | Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$tempfile"
+		add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"" | tr -d '\t' | Filter_IP_Line >> "$file_temp"
+		echo "$whitelist_ip" | Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$file_temp"
 		whitelist_domain="$(nvram get ntp_server0) $(nvram get ntp_server1) $(echo "$blacklist_set" | Strip_Domain) $whitelist_domain"
 		for domain in $(echo "$whitelist_domain" | Filter_Domain); do
-			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$tempfile" &
+			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$file_temp" &
 			n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 		done
 		wait
-		hashsize=$((8 + $(wc -l < "$tempfile")))
+		hashsize=$((8 + $(wc -l < "$file_temp")))
 		ipset -q destroy "Skynet-Temp"
 		ipset create Skynet-Temp hash:net hashsize "$hashsize" comment
-		ipset restore -! -f "$tempfile"
+		ipset restore -! -f "$file_temp"
 		ipset swap "Skynet-Whitelist" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
 }
@@ -349,36 +351,46 @@ Load_Blacklist () {
 
 
 Load_Domain () {
-		[ $((updatecount % 32)) -ne 0 ] && return
+		[ $((updatecount % 48)) -ne 0 ] && return
 		logger -st Skynet "[i] Update blacklist_domain"
-		echo -n "" > "$tempfile"
+		echo -n "" > "$file_temp"
 		for domain in $(echo "$blacklist_domain" | Filter_Domain); do
-			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$tempfile" &
+			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$file_temp" &
 			n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 		done
 		wait
-		hashsize=$((8 + $(wc -l < "$tempfile")))
+		hashsize=$((8 + $(wc -l < "$file_temp")))
 		ipset -q destroy "Skynet-Temp"
 		ipset create Skynet-Temp hash:net hashsize "$hashsize" comment
-		ipset restore -! -f "$tempfile"
+		ipset restore -! -f "$file_temp"
 		ipset swap "Skynet-Domain" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
 }
 
 
 Load_ASN () {
-		[ $((updatecount % 32)) -ne 0 ] && return
+		[ $((updatecount % 48)) -ne 0 ] && [ ! -f "$file_retryasn" ] && return
 		logger -st Skynet "[i] Update blacklist_asn"
-		echo -n "" > "$tempfile"
+		rm -f "$file_retryasn"
+		echo -n "" > "$file_temp"
 		for asn in $(echo "$blacklist_asn" | Filter_ASN); do
-			curl -fsL --retry 4 "https://ipinfo.io/$asn" | Filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$tempfile" &
-			n=$((n + 1)); [ $((n % 25)) -eq 0 ] && wait
+			(
+				set -o pipefail; curl -fsL --retry 3 "https://ipinfo.io/$asn" | Filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$file_temp"
+				if [ $? -ne 0 ]; then
+					logger -st Skynet "[*] Download error https://ipinfo.io/$asn"
+					touch "$file_errorlog"; echo "$(date) | Download error | https://ipinfo.io/$asn" >> "$file_errorlog"
+					touch "$file_retryasn"
+				fi
+			) &
+			n=$((n + 1)); [ $((n % 10)) -eq 0 ] && wait
+			[ -f "$file_retryasn" ] && return
 		done
 		wait
-		hashsize=$((8 + $(wc -l < "$tempfile")))
+		[ -f "$file_retryasn" ] && return
+		hashsize=$((8 + $(wc -l < "$file_temp")))
 		ipset -q destroy "Skynet-Temp"
 		ipset create "Skynet-Temp" hash:net hashsize "$hashsize" comment
-		ipset restore -! -f "$tempfile"
+		ipset restore -! -f "$file_temp"
 		ipset swap "Skynet-ASN" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
 }
@@ -387,7 +399,7 @@ Load_ASN () {
 Load_Set () {
 		setname="$1"; comment="$2"
 		logger -st Skynet "[i] Update $comment"
-		file="$cachedir/$setname"
+		file="$dir_cache/$setname"
 		hashsize=$((8 + $(wc -l < "$file")))
 		if ! ipset list -n "$setname" >/dev/null 2>&1; then
 			ipset create "$setname" hash:net hashsize "$hashsize" maxelem 262144 comment
@@ -414,28 +426,26 @@ Download_Set () {
 			if [ -z "$update_cycles" ]; then
 				update_cycles=4
 			fi
-			if [ -f "$retrydir/$setname" ]; then
+			if [ -f "$dir_retry/$setname" ]; then
 				update_cycles=1
+				rm -f "$dir_retry/$setname"
 			fi
 			if [ $((updatecount % update_cycles)) -ne 0 ]; then
 				continue
 			fi
 
-			file="$cachedir/$setname"
-			if response_code=$(curl -fsL --retry 4 $url --output "$tempfile" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
-				mv -f "$tempfile" "$file"
+			file="$dir_cache/$setname"
+			if response_code=$(curl -fsL --retry 4 $url --output "$file_temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
+				mv -f "$file_temp" "$file"
 				Load_Set "$setname" "$comment"
-				rm -f "$retrydir/$setname"
 			elif [ "$response_code" = "304" ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
 				Load_Set "$setname" "$comment"
-				rm -f "$retrydir/$setname"
 			elif [ "$response_code" = "304" ]; then
 				logger -st Skynet "[-] Fresh $comment"
-				rm -f "$retrydir/$setname"
 			else
 				logger -st Skynet "[*] Download error $url"
-				touch "$errorlogfile"; echo "$(date) | Download error | $response_code | $url" >> "$errorlogfile"
-				touch "$retrydir/$setname"
+				touch "$file_errorlog"; echo "$(date) | Download error | $response_code | $url" >> "$file_errorlog"
+				touch "$dir_retry/$setname"
 			fi
 		done
 
@@ -453,7 +463,7 @@ Download_Set () {
 				ipset -q destroy "$setname"
 			fi
 		done
-		for dir in "$cachedir" "$retrydir"; do
+		for dir in "$dir_cache" "$dir_retry"; do
 			cd "$dir"
 			for setname in $(ls -1t); do
 				if ! echo "$list" | grep -q "$setname"; then
@@ -478,9 +488,9 @@ echo
 
 if [ "$command" = "reset" ] || ! ipset list -n Skynet-Master >/dev/null 2>&1; then
 		logger -st Skynet "[i] Install"
-		touch "$installtime"
-		touch "$errorlogfile"
-		echo 0 > "$updatecountfile"
+		touch "$file_installtime"
+		touch "$file_errorlog"
+		echo 0 > "$file_updatecount"
 		if [ "$0" != "/jffs/scripts/firewall" ]; then
 			mv -f "$0" "/jffs/scripts/firewall"
 			logger -st Skynet "[*] Skynet Lite moved to /jffs/scripts/firewall"
@@ -528,15 +538,15 @@ case "$command" in
 			Unload_IPTables
 			Unload_LogIPTables
 			Unload_IPSets
-			rm -fr "$skynetdir"
+			rm -fr "$dir_skynet"
 			rm -f "$lockfile" "$0"
 			echo; exit 0;
 		;;
 
 
 		"error")
-			if [ -f "$errorlogfile" ] && [ $(wc -l < "$errorlogfile") -ge 1 ]; then
-				cat "$errorlogfile"
+			if [ -f "$file_errorlog" ] && [ $(wc -l < "$file_errorlog") -ge 1 ]; then
+				cat "$file_errorlog"
 			else
 				echo "Empty error log"
 			fi
@@ -549,9 +559,9 @@ case "$command" in
 			echo " Update                                                    "
 			echo "-----------------------------------------------------------"
 			if [ "$option" = "cru" ]; then
-				updatecount=$(head -1 "$updatecountfile" 2>/dev/null)
+				updatecount=$(head -1 "$file_updatecount" 2>/dev/null)
 				updatecount=$((updatecount + 1))
-				echo "$updatecount" > "$updatecountfile"
+				echo "$updatecount" > "$file_updatecount"
 			fi
 			Load_Whitelist
 			Load_Blacklist
@@ -566,9 +576,9 @@ case "$command" in
 			echo " Blacklist                                   Last download "
 			echo "-----------------------------------------------------------"
 			lookup=$(ipset list Skynet-Master | Filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
-			cd "$cachedir"
+			cd "$dir_cache"
 			for setname in $(ls -1t | Filter_Skynet_Set); do
-				printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(File_Age "$cachedir/$setname")"
+				printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(File_Age "$dir_cache/$setname")"
 			done
 		;;
 
@@ -603,4 +613,4 @@ esac
 
 
 echo "-----------------------------------------------------------"
-printf " %-25s  %30s\n\n" "Uptime $(File_Age "$installtime")" "$(n=$(ls -1 "$retrydir" | Filter_Skynet_Set | wc -l); [ $n -eq 1 ] && echo "1 failed download pending"; [ $n -ge 2 ] && echo "$n failed downloads pending")"
+printf " %-25s  %30s\n\n" "Uptime $(File_Age "$file_installtime")" "$(if [ $(ls -1 "$dir_retry" | Filter_Skynet_Set | wc -l) -ge 1 ] || [ -f "$file_retryasn" ]; then echo "[i] Failed downloads queued"; fi)"
