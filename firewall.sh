@@ -52,7 +52,7 @@ loginvalid="disabled"
 
 blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
-					<cleantalk_1day>				https://iplists.firehol.org/files/cleantalk_1d.ipset  {1}
+					<cleantalk_1day>				https://iplists.firehol.org/files/cleantalk_1d.ipset
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {1}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
 					<maxmind_proxy_fraud>			https://iplists.firehol.org/files/maxmind_proxy_fraud.ipset  {12}
@@ -65,7 +65,7 @@ blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.tx
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
 					<stopforumspam_1day>			https://iplists.firehol.org/files/stopforumspam_1d.ipset  {1}
 					<stopforumspam_toxic>			https://www.stopforumspam.com/downloads/toxic_ip_cidr.txt  {1}
-					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
+					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset
 					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
 blacklist_ip=""
 blacklist_domain=""
