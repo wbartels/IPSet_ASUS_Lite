@@ -441,9 +441,6 @@ Download_Set () {
 			if response_code=$(curl -fsL --retry 4 $url --output "$file_temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 				mv -f "$file_temp" "$file"
 				Load_Set "$setname" "$comment"
-
-				touch "$dir_update/$comment"
-				echo $(date) >> "$dir_update/$comment"
 			elif [ "$response_code" = "304" ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
 				Load_Set "$setname" "$comment"
 			elif [ "$response_code" = "304" ]; then
