@@ -96,6 +96,11 @@ file_temp="$dir_system/temp"
 mkdir -p "$dir_cache" "$dir_reload" "$dir_system"
 
 
+if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
+	command="reset"
+fi
+
+
 i=0
 while [ "$(nvram get ntp_ready)" = "0" ]; do
 		if [ $i -eq 0 ]; then logger -st Skynet "[i] Waiting for NTP to sync..."; fi
@@ -108,7 +113,7 @@ while [ "$(nvram get ntp_ready)" = "0" ]; do
 done
 
 
-if [ "$command" = "update" ] || [ "$command" = "reset" ] || ! ipset list -n Skynet-Master >/dev/null 2>&1; then
+if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 		for i in 1 2 3 4 5 6; do
 			if ping -q -w1 -c1 google.com >/dev/null 2>&1; then break; fi
 			if ping -q -w1 -c1 github.com >/dev/null 2>&1; then break; fi
@@ -489,45 +494,6 @@ echo " Code based on Skynet By Adamm"
 echo
 
 
-if [ "$command" = "reset" ] || ! ipset list -n Skynet-Master >/dev/null 2>&1; then
-		logger -st Skynet "[i] Install"
-		touch "$file_installtime"
-		touch "$file_errorlog"
-		echo 0 > "$file_updatecount"
-		if [ "$0" != "/jffs/scripts/firewall" ]; then
-			mv -f "$0" "/jffs/scripts/firewall"
-			logger -st Skynet "[*] Skynet Lite moved to /jffs/scripts/firewall"
-		fi
-		if [ ! -f "/jffs/scripts/firewall-start" ]; then
-			echo "#!/bin/sh
-			sh /jffs/scripts/firewall" | tr -d '\t' > "/jffs/scripts/firewall-start"
-			chmod 755 "/jffs/scripts/firewall-start"
-		elif [ -f "/jffs/scripts/firewall-start" ] && ! grep -q "/jffs/scripts/firewall" "/jffs/scripts/firewall-start"; then
-			chmod 755 "/jffs/scripts/firewall-start"
-			echo "sh /jffs/scripts/firewall" >> "/jffs/scripts/firewall-start"
-		fi
-		rand=$(printf '%d' 0x$(openssl rand 1 -hex)) # 0..255
-		m1=$((rand / 18 + 0));  m2=$((rand / 18 + 15))
-		m3=$((rand / 18 + 30)); m4=$((rand / 18 + 45))
-		cru d Skynet_update
-		cru a Skynet_update "$m1,$m2,$m3,$m4 * * * * sh /jffs/scripts/firewall update cru"
-		Unload_IPTables
-		Unload_LogIPTables
-		Unload_IPSets
-		echo 'create Skynet-Master list:set size 64 comment counters
-		create Skynet-Whitelist hash:net hashsize 64 comment
-		create Skynet-Blacklist hash:net hashsize 64 comment
-		create Skynet-Domain hash:net hashsize 64 comment
-		create Skynet-ASN hash:net hashsize 64 comment
-		add Skynet-Master Skynet-Blacklist comment "blacklist_ip/cidr"
-		add Skynet-Master Skynet-Domain comment "blacklist_domain"
-		add Skynet-Master Skynet-ASN comment "blacklist_asn"' | tr -d '\t' | ipset restore -!
-		Load_IPTables
-		Load_LogIPTables
-		command="update"
-fi
-
-
 ip=$(echo "$command" | Is_IP) || ip="noip"
 case "$command" in
 		"uninstall")
@@ -554,6 +520,52 @@ case "$command" in
 				echo "Empty error log"
 			fi
 			echo; exit 0;
+		;;
+
+
+		"reset")
+			echo "-----------------------------------------------------------"
+			echo " Reset                                                     "
+			echo "-----------------------------------------------------------"
+			logger -st Skynet "[i] Install"
+			touch "$file_installtime"
+			touch "$file_errorlog"
+			echo 0 > "$file_updatecount"
+			if [ "$0" != "/jffs/scripts/firewall" ]; then
+				mv -f "$0" "/jffs/scripts/firewall"
+				logger -st Skynet "[*] Skynet Lite moved to /jffs/scripts/firewall"
+			fi
+			if [ ! -f "/jffs/scripts/firewall-start" ]; then
+				echo "#!/bin/sh
+				sh /jffs/scripts/firewall" | tr -d '\t' > "/jffs/scripts/firewall-start"
+				chmod 755 "/jffs/scripts/firewall-start"
+			elif [ -f "/jffs/scripts/firewall-start" ] && ! grep -q "/jffs/scripts/firewall" "/jffs/scripts/firewall-start"; then
+				chmod 755 "/jffs/scripts/firewall-start"
+				echo "sh /jffs/scripts/firewall" >> "/jffs/scripts/firewall-start"
+			fi
+			rand=$(printf '%d' 0x$(openssl rand 1 -hex)) # 0..255
+			m1=$((rand / 18 + 0));  m2=$((rand / 18 + 15))
+			m3=$((rand / 18 + 30)); m4=$((rand / 18 + 45))
+			cru d Skynet_update
+			cru a Skynet_update "$m1,$m2,$m3,$m4 * * * * sh /jffs/scripts/firewall update cru"
+			Unload_IPTables
+			Unload_LogIPTables
+			Unload_IPSets
+			echo 'create Skynet-Master list:set size 64 comment counters
+			create Skynet-Whitelist hash:net hashsize 64 comment
+			create Skynet-Blacklist hash:net hashsize 64 comment
+			create Skynet-Domain hash:net hashsize 64 comment
+			create Skynet-ASN hash:net hashsize 64 comment
+			add Skynet-Master Skynet-Blacklist comment "blacklist_ip/cidr"
+			add Skynet-Master Skynet-Domain comment "blacklist_domain"
+			add Skynet-Master Skynet-ASN comment "blacklist_asn"' | tr -d '\t' | ipset restore -!
+			Load_IPTables
+			Load_LogIPTables
+			Load_Whitelist
+			Load_Blacklist
+			Load_Domain
+			Load_ASN
+			Download_Set
 		;;
 
 
