@@ -50,13 +50,13 @@ logmode="enabled"
 loginvalid="disabled"
 
 
-blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.txt
+blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
 					<cleantalk_1day>				https://iplists.firehol.org/files/cleantalk_1d.ipset  {1}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {1}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<maxmind_proxy_fraud>			https://iplists.firehol.org/files/maxmind_proxy_fraud.ipset
-					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt
+					<maxmind_proxy_fraud>			https://iplists.firehol.org/files/maxmind_proxy_fraud.ipset  {12}
+					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
 					<normshield_high_attack>		https://iplists.firehol.org/files/normshield_high_attack.ipset
 					<normshield_high_bruteforce>	https://iplists.firehol.org/files/normshield_high_bruteforce.ipset
 					<normshield_high_suspicious>	https://iplists.firehol.org/files/normshield_high_suspicious.ipset
@@ -64,7 +64,7 @@ blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.tx
 					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
 					<stopforumspam_1day>			https://iplists.firehol.org/files/stopforumspam_1d.ipset  {1}
-					<stopforumspam_toxic>			https://www.stopforumspam.com/downloads/toxic_ip_cidr.txt  {24}
+					<stopforumspam_toxic>			https://www.stopforumspam.com/downloads/toxic_ip_cidr.txt  {1}
 					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
 					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
 blacklist_ip=""
@@ -85,20 +85,25 @@ updatecount=0
 
 dir_skynet="/tmp/skynet"
 dir_cache="$dir_skynet/cache"
-dir_retry="$dir_skynet/retry"
+dir_reload="$dir_skynet/reload"
 dir_system="$dir_skynet/system"
-file_retryasn="$dir_system/retryasn"
-file_temp="$dir_system/temp"
+file_errorlog="$dir_skynet/error.log"
 file_installtime="$dir_system/installtime"
 file_updatecount="$dir_system/updatecount"
-file_errorlog="$dir_skynet/error.log"
-mkdir -p "$dir_cache" "$dir_retry" "$dir_system"
+file_reload="$dir_system/reload"
+file_reloadasn="$dir_system/reloadasn"
+file_temp="$dir_system/temp"
+mkdir -p "$dir_cache" "$dir_reload" "$dir_system"
 
 
 i=0
 while [ "$(nvram get ntp_ready)" = "0" ]; do
 		if [ $i -eq 0 ]; then logger -st Skynet "[i] Waiting for NTP to sync..."; fi
-		if [ $i -eq 300 ]; then logger -st Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!"; echo; exit 1; fi
+		if [ $i -eq 300 ]; then
+			logger -st Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!";
+			touch "$file_reload"
+			echo; exit 1;
+		fi
 		i=$((i + 1)); sleep 1
 done
 
@@ -112,6 +117,7 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ] || ! ipset list -n Skyn
 			if [ $i -eq 6 ]; then
 				logger -st Skynet "[*] Internet connectivity error"
 				touch "$file_errorlog"; echo "$(date) | Internet connectivity error" >> "$file_errorlog"
+				touch "$file_reload"
 				echo; exit 1
 			fi
 			sleep 7
@@ -326,7 +332,7 @@ Load_Whitelist () {
 			n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 		done
 		wait
-		hashsize=$((8 + $(wc -l < "$file_temp")))
+		hashsize=$(($(wc -l < "$file_temp") + 8))
 		ipset -q destroy "Skynet-Temp"
 		ipset create Skynet-Temp hash:net hashsize "$hashsize" comment
 		ipset restore -! -f "$file_temp"
@@ -338,7 +344,7 @@ Load_Whitelist () {
 Load_Blacklist () {
 		[ "$option" = "cru" ] && return
 		logger -st Skynet "[i] Update blacklist_ip/cidr"
-		hashsize=$((8 + $(echo "$blacklist_ip" | wc -l)))
+		hashsize=$(($(echo "$blacklist_ip" | wc -l) + 8))
 		ipset -q destroy "Skynet-Temp"
 		ipset create Skynet-Temp hash:net hashsize "$hashsize" comment
 		echo "$blacklist_ip" | Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' | ipset restore -!
@@ -356,7 +362,7 @@ Load_Domain () {
 			n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 		done
 		wait
-		hashsize=$((8 + $(wc -l < "$file_temp")))
+		hashsize=$(($(wc -l < "$file_temp") + 8))
 		ipset -q destroy "Skynet-Temp"
 		ipset create Skynet-Temp hash:net hashsize "$hashsize" comment
 		ipset restore -! -f "$file_temp"
@@ -366,9 +372,9 @@ Load_Domain () {
 
 
 Load_ASN () {
-		[ $((updatecount % 48)) -ne 0 ] && [ ! -f "$file_retryasn" ] && return
+		[ $((updatecount % 48)) -ne 0 ] && [ ! -f "$file_reloadasn" ] && return
 		logger -st Skynet "[i] Update blacklist_asn"
-		rm -f "$file_retryasn"
+		rm -f "$file_reloadasn"
 		echo -n "" > "$file_temp"
 		for asn in $(echo "$blacklist_asn" | Filter_ASN); do
 			(
@@ -376,15 +382,15 @@ Load_ASN () {
 				if [ $? -ne 0 ]; then
 					logger -st Skynet "[*] Download error https://ipinfo.io/$asn"
 					touch "$file_errorlog"; echo "$(date) | Download error | https://ipinfo.io/$asn" >> "$file_errorlog"
-					touch "$file_retryasn"
+					touch "$file_reloadasn"
 				fi
 			) &
 			n=$((n + 1)); [ $((n % 10)) -eq 0 ] && wait
-			[ -f "$file_retryasn" ] && return
+			[ -f "$file_reloadasn" ] && return
 		done
 		wait
-		[ -f "$file_retryasn" ] && return
-		hashsize=$((8 + $(wc -l < "$file_temp")))
+		[ -f "$file_reloadasn" ] && return
+		hashsize=$(($(wc -l < "$file_temp") + 8))
 		ipset -q destroy "Skynet-Temp"
 		ipset create "Skynet-Temp" hash:net hashsize "$hashsize" comment
 		ipset restore -! -f "$file_temp"
@@ -397,7 +403,7 @@ Load_Set () {
 		setname="$1"; comment="$2"
 		logger -st Skynet "[i] Update $comment"
 		file="$dir_cache/$setname"
-		hashsize=$((8 + $(wc -l < "$file")))
+		hashsize=$(($(wc -l < "$file") + 8))
 		if ! ipset list -n "$setname" >/dev/null 2>&1; then
 			ipset create "$setname" hash:net hashsize "$hashsize" maxelem 262144 comment
 			ipset add Skynet-Master "$setname" comment "$comment"
@@ -423,9 +429,9 @@ Download_Set () {
 			if [ -z "$update_cycles" ]; then
 				update_cycles=4
 			fi
-			if [ -f "$dir_retry/$setname" ]; then
+			if [ -f "$dir_reload/$setname" ]; then
 				update_cycles=1
-				rm -f "$dir_retry/$setname"
+				rm -f "$dir_reload/$setname"
 			fi
 			if [ $((updatecount % update_cycles)) -ne 0 ]; then
 				continue
@@ -435,6 +441,9 @@ Download_Set () {
 			if response_code=$(curl -fsL --retry 4 $url --output "$file_temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 				mv -f "$file_temp" "$file"
 				Load_Set "$setname" "$comment"
+
+				touch "$dir_update/$comment"
+				echo $(date) >> "$dir_update/$comment"
 			elif [ "$response_code" = "304" ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
 				Load_Set "$setname" "$comment"
 			elif [ "$response_code" = "304" ]; then
@@ -442,7 +451,7 @@ Download_Set () {
 			else
 				logger -st Skynet "[*] Download error $url"
 				touch "$file_errorlog"; echo "$(date) | Download error | $response_code | $url" >> "$file_errorlog"
-				touch "$dir_retry/$setname"
+				touch "$dir_reload/$setname"
 			fi
 		done
 
@@ -460,7 +469,7 @@ Download_Set () {
 				ipset -q destroy "$setname"
 			fi
 		done
-		for dir in "$dir_cache" "$dir_retry"; do
+		for dir in "$dir_cache" "$dir_reload"; do
 			cd "$dir"
 			for setname in $(ls -1t); do
 				if ! echo "$list" | grep -q "$setname"; then
@@ -555,7 +564,7 @@ case "$command" in
 			echo "-----------------------------------------------------------"
 			echo " Update                                                    "
 			echo "-----------------------------------------------------------"
-			if [ "$option" = "cru" ]; then
+			if [ "$option" = "cru" ] && [ ! -f "$file_reload" ]; then
 				updatecount=$(head -1 "$file_updatecount" 2>/dev/null)
 				updatecount=$((updatecount + 1))
 				echo "$updatecount" > "$file_updatecount"
@@ -565,6 +574,7 @@ case "$command" in
 			Load_Domain
 			Load_ASN
 			Download_Set
+			rm -f "$file_reload"
 		;;
 
 
@@ -610,4 +620,4 @@ esac
 
 
 echo "-----------------------------------------------------------"
-printf " %-25s  %30s\n\n" "Uptime $(File_Age "$file_installtime")" "$(if [ $(ls -1 "$dir_retry" | Filter_Skynet_Set | wc -l) -ge 1 ] || [ -f "$file_retryasn" ]; then echo "[i] Failed downloads queued"; fi)"
+printf " %-25s  %30s\n\n" "Uptime $(File_Age "$file_installtime")" "$(if [ -f "$file_reload" ] || [ -f "$file_reloadasn" ] || [ $(ls -1 "$dir_reload" | Filter_Skynet_Set | wc -l) -ge 1 ]; then echo "[i] Reload downloads queued"; fi)"
