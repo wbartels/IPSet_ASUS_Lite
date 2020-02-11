@@ -335,7 +335,7 @@ Load_Whitelist () {
 		add Skynet-Temp $(nvram get dhcp_dns1_x) comment \"Whitelist: dhcp_dns1_x\"
 		add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"" | tr -d '\t' | Filter_IP_Line >> "$file_temp"
 		echo "$whitelist_ip" | Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$file_temp"
-		whitelist_domain="$(nvram get ntp_server0) $(nvram get ntp_server1) $(echo "$blacklist_set" | Strip_Domain) $whitelist_domain"
+		local whitelist_domain="$(nvram get ntp_server0) $(nvram get ntp_server1) $(echo "$blacklist_set" | Strip_Domain) $whitelist_domain"
 		for domain in $(echo "$whitelist_domain" | Filter_Domain); do
 			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$file_temp" &
 			n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
@@ -390,7 +390,7 @@ Load_ASN () {
 				set -o pipefail; curl -fsL --retry 4 "https://ipinfo.io/$asn" | Filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$file_temp"
 				if [ $? -ne 0 ]; then
 					logger -st Skynet "[*] Download error https://ipinfo.io/$asn"
-					touch "$file_errorlog"; echo "$(date) | Download error | https://ipinfo.io/$asn" >> "$file_errorlog"
+					echo "$(date) | Download error | https://ipinfo.io/$asn" >> "$file_errorlog"
 					touch "$file_reloadasn"
 				fi
 			) &
@@ -463,8 +463,8 @@ Download_Set () {
 
 		# Unload unlisted set
 		[ "$option" = "cru" ] && return
-		lookup=$(ipset list Skynet-Master | Filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
-		list=""
+		local lookup=$(ipset list Skynet-Master | Filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
+		local list=""
 		for url in $(echo "$blacklist_set" | Filter_URL); do
 			list="$list Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
 		done
