@@ -65,7 +65,7 @@ blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.tx
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
 					<stopforumspam_1day>			https://iplists.firehol.org/files/stopforumspam_1d.ipset  {1}
 					<stopforumspam_toxic>			https://www.stopforumspam.com/downloads/toxic_ip_cidr.txt  {1}
-					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset
+					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
 					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
 blacklist_ip=""
 blacklist_domain=""
@@ -92,6 +92,7 @@ file_installtime="$dir_system/installtime"
 file_updatecount="$dir_system/updatecount"
 file_reload="$dir_system/reload"
 file_reloadasn="$dir_system/reloadasn"
+file_sleep="$dir_system/sleep"
 file_temp="$dir_system/temp"
 mkdir -p "$dir_cache" "$dir_reload" "$dir_system"
 
@@ -121,7 +122,7 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 			if [ $i -eq 1 ]; then logger -st Skynet "[*] Waiting for internet connectivity..."; fi
 			if [ $i -eq 6 ]; then
 				logger -st Skynet "[*] Internet connectivity error"
-				touch "$file_errorlog"; echo "$(date) | Internet connectivity error" >> "$file_errorlog"
+				echo "$(date) | Internet connectivity error" >> "$file_errorlog"
 				touch "$file_reload"
 				echo; exit 1
 			fi
@@ -130,9 +131,12 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 fi
 
 
-if [ "$command" = "update" ] && [ "$option" = "cru" ] && [ $(($(date +%s) % 60)) -lt 10 ]; then
-		rand=$(printf '%d' 0x$(openssl rand 1 -hex)) # 0..255
-		sleep $((rand / 5))
+if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
+		if ! sleep=$(head -1 "$file_sleep" 2>/dev/null); then
+			sleep=$(($(printf '%d' 0x$(openssl rand 1 -hex)) / 5)) # 0..255 / 5
+			echo "$sleep" > "$file_sleep"
+		fi
+		sleep $sleep
 fi
 
 
@@ -230,7 +234,7 @@ Domain_Lookup () {
 		set -o pipefail; nslookup "$1" 2>/dev/null | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk 'NR>2'
 		if [ $? -ne 0 ]; then
 			logger -st Skynet "[*] DNS lookup failed for $1"
-			touch "$file_errorlog"; echo "$(date) | DNS lookup failed | $1" >> "$file_errorlog"
+			echo "$(date) | DNS lookup failed | $1" >> "$file_errorlog"
 		fi
 }
 
@@ -452,7 +456,7 @@ Download_Set () {
 				logger -st Skynet "[-] Fresh $comment"
 			else
 				logger -st Skynet "[*] Download error $url"
-				touch "$file_errorlog"; echo "$(date) | Download error | $response_code | $url" >> "$file_errorlog"
+				echo "$(date) | Download error | $response_code | $url" >> "$file_errorlog"
 				touch "$dir_reload/$setname"
 			fi
 		done
