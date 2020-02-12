@@ -65,7 +65,7 @@ blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.tx
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
 					<stopforumspam_1day>			https://iplists.firehol.org/files/stopforumspam_1d.ipset  {1}
 					<stopforumspam_toxic>			https://www.stopforumspam.com/downloads/toxic_ip_cidr.txt  {1}
-					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
+					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset
 					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
 blacklist_ip=""
 blacklist_domain=""
@@ -155,6 +155,9 @@ else
 fi
 
 
+unset i sleep
+
+
 ###############
 #- Functions -#
 ###############
@@ -182,7 +185,7 @@ Load_IPTables () {
 			iptables -t raw -I OUTPUT -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j DROP 2>/dev/null
 		fi
 		if [ "$(nvram get sshd_enable)" = "1" ] && [ "$(nvram get sshd_bfp)" = "1" ] && [ "$(uname -o)" = "ASUSWRT-Merlin" ] && [ "$(nvram get switch_wantag)" != "movistar" ]; then
-			pos1="$(iptables --line -nL SSHBFP | grep -F "seconds: 60 hit_count: 4" | grep -E 'DROP|logdrop' | awk '{print $1}')"
+			local pos1="$(iptables --line -nL SSHBFP | grep -F "seconds: 60 hit_count: 4" | grep -E 'DROP|logdrop' | awk '{print $1}')"
 			iptables -I SSHBFP "$pos1" -m recent --update --seconds 60 --hitcount 4 --name SSH --rsource -j SET --add-set Skynet-Blacklist src 2>/dev/null
 			iptables -I SSHBFP "$pos1" -m recent --update --seconds 60 --hitcount 4 --name SSH --rsource -j LOG --log-prefix "[BLOCKED - NEW BAN] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 		fi
@@ -201,19 +204,19 @@ Unload_LogIPTables () {
 Load_LogIPTables () {
 		if [ "$logmode" = "enabled" ]; then
 			if [ "$filtertraffic" = "all" ] || [ "$filtertraffic" = "inbound" ]; then
-				pos2="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Master src" | grep -F "DROP" | awk '{print $1}')"
+				local pos2="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Master src" | grep -F "DROP" | awk '{print $1}')"
 				iptables -t raw -I PREROUTING "$pos2" -i "$iface" -m set ! --match-set Skynet-Whitelist src -m set --match-set Skynet-Master src -j LOG --log-prefix "[BLOCKED - INBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 			fi
 			if [ "$filtertraffic" = "all" ] || [ "$filtertraffic" = "outbound" ]; then
-				pos3="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Master dst" | grep -F "DROP" | awk '{print $1}')"
+				local pos3="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Master dst" | grep -F "DROP" | awk '{print $1}')"
 				iptables -t raw -I PREROUTING "$pos3" -i br0 -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
-				pos4="$(iptables --line -nL OUTPUT -t raw | grep -F "Skynet-Master dst" | grep -F "DROP" | awk '{print $1}')"
+				local pos4="$(iptables --line -nL OUTPUT -t raw | grep -F "Skynet-Master dst" | grep -F "DROP" | awk '{print $1}')"
 				iptables -t raw -I OUTPUT "$pos4" -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 			fi
 			if [ "$(nvram get fw_log_x)" = "drop" ] || [ "$(nvram get fw_log_x)" = "both" ] && [ "$loginvalid" = "enabled" ]; then
 				iptables -I logdrop -m state --state NEW -j LOG --log-prefix "[BLOCKED - INVALID] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 			fi
-			pos5="$(iptables --line -nL FORWARD | grep -F "Skynet-IOT" | grep -F "DROP" | awk '{print $1}')"
+			local pos5="$(iptables --line -nL FORWARD | grep -F "Skynet-IOT" | grep -F "DROP" | awk '{print $1}')"
 			iptables -I FORWARD "$pos5" -i br0 -m set --match-set Skynet-IOT src ! -o tun2+ -j LOG --log-prefix "[BLOCKED - IOT] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 		fi
 }
@@ -311,7 +314,7 @@ LAN_CIDR_Lookup () {
 
 
 File_Age () {
-		sec=$(($(date +%s) - $(date +%s -r "$1" 2>/dev/null || date +%s)))
+		local sec=$(($(date +%s) - $(date +%s -r "$1" 2>/dev/null || date +%s)))
 		if [ $sec -lt 86400 ]; then
 			printf '%02d:%02d' $(($sec/3600)) $(($sec%3600/60))
 		elif [ $sec -lt 172800 ]; then
@@ -325,7 +328,7 @@ File_Age () {
 Load_Whitelist () {
 		[ $((updatecount % 48)) -ne 0 ] && return
 		logger -st Skynet "[i] Update whitelist"
-		echo -n "" > "$file_temp"
+		true > "$file_temp"
 		echo "add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback_ipaddr\"
 		add Skynet-Temp $(LAN_CIDR_Lookup $(nvram get lan_ipaddr)) comment \"Whitelist: lan_ipaddr\"
 		add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Whitelist: wan0_ipaddr\"
@@ -336,14 +339,14 @@ Load_Whitelist () {
 		add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"" | tr -d '\t' | Filter_IP_Line >> "$file_temp"
 		echo "$whitelist_ip" | Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$file_temp"
 		local whitelist_domain="$(nvram get ntp_server0) $(nvram get ntp_server1) $(echo "$blacklist_set" | Strip_Domain) $whitelist_domain"
+		local domain n
 		for domain in $(echo "$whitelist_domain" | Filter_Domain); do
 			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$file_temp" &
 			n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 		done
 		wait
-		hashsize=$(($(wc -l < "$file_temp") + 8))
 		ipset -q destroy "Skynet-Temp"
-		ipset create Skynet-Temp hash:net hashsize "$hashsize" comment
+		ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$file_temp") + 8))" comment
 		ipset restore -! -f "$file_temp"
 		ipset swap "Skynet-Whitelist" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
@@ -353,9 +356,8 @@ Load_Whitelist () {
 Load_Blacklist () {
 		[ "$option" = "cru" ] && return
 		logger -st Skynet "[i] Update blacklist_ip/cidr"
-		hashsize=$(($(echo "$blacklist_ip" | wc -l) + 8))
 		ipset -q destroy "Skynet-Temp"
-		ipset create Skynet-Temp hash:net hashsize "$hashsize" comment
+		ipset create Skynet-Temp hash:net hashsize "$(($(echo "$blacklist_ip" | wc -l) + 8))" comment
 		echo "$blacklist_ip" | Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' | ipset restore -!
 		ipset swap "Skynet-Blacklist" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
@@ -365,15 +367,15 @@ Load_Blacklist () {
 Load_Domain () {
 		[ $((updatecount % 48)) -ne 0 ] && return
 		logger -st Skynet "[i] Update blacklist_domain"
-		echo -n "" > "$file_temp"
+		true > "$file_temp"
+		local domain n=0
 		for domain in $(echo "$blacklist_domain" | Filter_Domain); do
 			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$file_temp" &
 			n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 		done
 		wait
-		hashsize=$(($(wc -l < "$file_temp") + 8))
 		ipset -q destroy "Skynet-Temp"
-		ipset create Skynet-Temp hash:net hashsize "$hashsize" comment
+		ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$file_temp") + 8))" comment
 		ipset restore -! -f "$file_temp"
 		ipset swap "Skynet-Domain" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
@@ -385,8 +387,10 @@ Load_ASN () {
 		logger -st Skynet "[i] Update blacklist_asn"
 		rm -f "$file_reloadasn"
 		echo -n "" > "$file_temp"
+		local asn n=0
 		for asn in $(echo "$blacklist_asn" | Filter_ASN); do
 			(
+				# subshell
 				set -o pipefail; curl -fsL --retry 4 "https://ipinfo.io/$asn" | Filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$file_temp"
 				if [ $? -ne 0 ]; then
 					logger -st Skynet "[*] Download error https://ipinfo.io/$asn"
@@ -399,9 +403,8 @@ Load_ASN () {
 		done
 		wait
 		[ -f "$file_reloadasn" ] && return
-		hashsize=$(($(wc -l < "$file_temp") + 8))
 		ipset -q destroy "Skynet-Temp"
-		ipset create "Skynet-Temp" hash:net hashsize "$hashsize" comment
+		ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$file_temp") + 8))" comment
 		ipset restore -! -f "$file_temp"
 		ipset swap "Skynet-ASN" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
@@ -409,16 +412,15 @@ Load_ASN () {
 
 
 Load_Set () {
-		setname="$1"; comment="$2"
 		logger -st Skynet "[i] Update $comment"
-		file="$dir_cache/$setname"
-		hashsize=$(($(wc -l < "$file") + 8))
+		# setname="$1" comment="$2"
+		# file="$dir_cache/$setname"
 		if ! ipset list -n "$setname" >/dev/null 2>&1; then
-			ipset create "$setname" hash:net hashsize "$hashsize" maxelem 262144 comment
+			ipset create "$setname" hash:net hashsize 64 maxelem 262144 comment
 			ipset add Skynet-Master "$setname" comment "$comment"
 		fi
 		ipset -q destroy "Skynet-Temp"
-		ipset create "Skynet-Temp" hash:net hashsize "$hashsize" maxelem 262144 comment
+		ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$file") + 8))" maxelem 262144 comment
 		< "$file" Filter_IP_CIDR | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' | ipset restore -!
 		ipset swap "$setname" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
@@ -427,6 +429,7 @@ Load_Set () {
 
 Download_Set () {
 		echo "$blacklist_set" | Filter_URL_Line | while IFS= read -r line; do
+			# subshell
 			url=$(echo "$line" | Filter_URL)
 			comment=$(echo "$line" | Filter_Comment)
 			update_cycles=$(echo "$line" | Filter_Update_Cycles)
@@ -449,9 +452,9 @@ Download_Set () {
 			file="$dir_cache/$setname"
 			if response_code=$(curl -fsL --retry 4 $url --output "$file_temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 				mv -f "$file_temp" "$file"
-				Load_Set "$setname" "$comment"
+				Load_Set #"$setname" "$comment"
 			elif [ "$response_code" = "304" ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
-				Load_Set "$setname" "$comment"
+				Load_Set #"$setname" "$comment"
 			elif [ "$response_code" = "304" ]; then
 				logger -st Skynet "[-] Fresh $comment"
 			else
@@ -464,7 +467,7 @@ Download_Set () {
 		# Unload unlisted set
 		[ "$option" = "cru" ] && return
 		local lookup=$(ipset list Skynet-Master | Filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
-		local list=""
+		local url list="" setname dir
 		for url in $(echo "$blacklist_set" | Filter_URL); do
 			list="$list Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
 		done
