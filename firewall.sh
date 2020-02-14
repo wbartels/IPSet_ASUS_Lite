@@ -342,9 +342,8 @@ Load_Whitelist () {
 		# Whitelist ip:
 		echo "$whitelist_ip" | Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$file_tempset"
 		# Whitelist domain:
-		local default_whitelis_domain="$(nvram get ntp_server0) $(nvram get ntp_server1) internic.net ipinfo.io $(echo "$blacklist_set" | Strip_Domain)"
 		local domain n=0
-		for domain in $(echo "$default_whitelis_domain $whitelist_domain" | Filter_Domain); do
+		for domain in $(echo "internic.net ipinfo.io $whitelist_domain $(echo "$blacklist_set" | Strip_Domain) $(nvram get ntp_server0) $(nvram get ntp_server1)" | Filter_Domain); do
 			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$file_tempset" &
 			n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 		done
@@ -352,6 +351,7 @@ Load_Whitelist () {
 		# Whitelist root hints:
 		local url="http://www.internic.net/domain/named.root"
 		local file="$dir_system/named.root"
+		local response_code
 		if response_code=$(curl -fsL --retry 4 $url --output "$file_temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 			mv -f "$file_temp" "$file"
 		fi
@@ -545,6 +545,7 @@ case "$command" in
 			echo " Reset                                                     "
 			echo "-----------------------------------------------------------"
 			logger -st Skynet "[i] Install"
+			rm -f "$dir_system/"*
 			touch "$file_installtime"
 			touch "$file_errorlog"
 			echo 0 > "$file_updatecount"
