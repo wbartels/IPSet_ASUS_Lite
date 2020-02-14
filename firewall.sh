@@ -94,6 +94,7 @@ file_reload="$dir_system/reload"
 file_reloadasn="$dir_system/reloadasn"
 file_sleep="$dir_system/sleep"
 file_temp="$dir_system/temp"
+file_tempset="$dir_system/tempset"
 mkdir -p "$dir_cache" "$dir_reload" "$dir_system"
 
 
@@ -328,7 +329,7 @@ File_Age () {
 Load_Whitelist () {
 		[ $((updatecount % 48)) -ne 0 ] && return
 		logger -st Skynet "[i] Update whitelist"
-		true > "$file_temp"
+		true > "$file_tempset"
 		# Whitelist router:
 		echo "add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback_ipaddr\"
 		add Skynet-Temp $(LAN_CIDR_Lookup $(nvram get lan_ipaddr)) comment \"Whitelist: lan_ipaddr\"
@@ -337,14 +338,14 @@ Load_Whitelist () {
 		add Skynet-Temp $(nvram get wan0_dns | awk '{print $1}') comment \"Whitelist: wan0_dns\"
 		add Skynet-Temp $(nvram get wan0_dns | awk '{print $2}') comment \"Whitelist: wan0_dns\"
 		add Skynet-Temp $(nvram get dhcp_dns1_x) comment \"Whitelist: dhcp_dns1_x\"
-		add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"" | tr -d '\t' | Filter_IP_Line >> "$file_temp"
+		add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"" | tr -d '\t' | Filter_IP_Line >> "$file_tempset"
 		# Whitelist ip:
-		echo "$whitelist_ip" | Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$file_temp"
+		echo "$whitelist_ip" | Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$file_tempset"
 		# Whitelist domain:
-		local whitelist_domain="$(nvram get ntp_server0) $(nvram get ntp_server1) $(echo "$blacklist_set" | Strip_Domain) internic.net $whitelist_domain"
+		local default_whitelis_domain="$(nvram get ntp_server0) $(nvram get ntp_server1) internic.net ipinfo.io $(echo "$blacklist_set" | Strip_Domain)"
 		local domain n=0
-		for domain in $(echo "$whitelist_domain" | Filter_Domain); do
-			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$file_temp" &
+		for domain in $(echo "$default_whitelis_domain $whitelist_domain" | Filter_Domain); do
+			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$file_tempset" &
 			n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 		done
 		wait
@@ -354,11 +355,11 @@ Load_Whitelist () {
 		if response_code=$(curl -fsL --retry 4 $url --output "$file_temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 			mv -f "$file_temp" "$file"
 		fi
-		< "$file" Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' >> "$file_temp"
+		< "$file" Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' >> "$file_tempset"
 		# Swap to Skynet-Whitelist:
 		ipset -q destroy "Skynet-Temp"
-		ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$file_temp") + 8))" comment
-		ipset restore -! -f "$file_temp"
+		ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$file_tempset") + 8))" comment
+		ipset restore -! -f "$file_tempset"
 		ipset swap "Skynet-Whitelist" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
 }
@@ -378,16 +379,16 @@ Load_Blacklist () {
 Load_Domain () {
 		[ $((updatecount % 48)) -ne 0 ] && return
 		logger -st Skynet "[i] Update blacklist_domain"
-		true > "$file_temp"
+		true > "$file_tempset"
 		local domain n=0
 		for domain in $(echo "$blacklist_domain" | Filter_Domain); do
-			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$file_temp" &
+			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$file_tempset" &
 			n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 		done
 		wait
 		ipset -q destroy "Skynet-Temp"
-		ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$file_temp") + 8))" comment
-		ipset restore -! -f "$file_temp"
+		ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$file_tempset") + 8))" comment
+		ipset restore -! -f "$file_tempset"
 		ipset swap "Skynet-Domain" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
 }
@@ -397,11 +398,11 @@ Load_ASN () {
 		[ $((updatecount % 48)) -ne 0 ] && [ ! -f "$file_reloadasn" ] && return
 		logger -st Skynet "[i] Update blacklist_asn"
 		rm -f "$file_reloadasn"
-		echo -n "" > "$file_temp"
+		echo -n "" > "$file_tempset"
 		local asn n=0
 		for asn in $(echo "$blacklist_asn" | Filter_ASN); do
 			(	# subshell
-				set -o pipefail; curl -fsL --retry 4 "https://ipinfo.io/$asn" | Filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$file_temp"
+				set -o pipefail; curl -fsL --retry 4 "https://ipinfo.io/$asn" | Filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$file_tempset"
 				if [ $? -ne 0 ]; then
 					logger -st Skynet "[*] Download error https://ipinfo.io/$asn"
 					echo "$(date) | Download error | https://ipinfo.io/$asn" >> "$file_errorlog"
@@ -414,8 +415,8 @@ Load_ASN () {
 		wait
 		[ -f "$file_reloadasn" ] && return
 		ipset -q destroy "Skynet-Temp"
-		ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$file_temp") + 8))" comment
-		ipset restore -! -f "$file_temp"
+		ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$file_tempset") + 8))" comment
+		ipset restore -! -f "$file_tempset"
 		ipset swap "Skynet-ASN" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
 }
