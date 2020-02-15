@@ -84,7 +84,8 @@ option="$2"
 updatecount=0
 
 dir_skynet="/tmp/skynet"
-dir_cache="$dir_skynet/cache"
+dir_cache1="$dir_skynet/cache1"
+dir_cache2="$dir_skynet/cache2"
 dir_reload="$dir_skynet/reload"
 dir_system="$dir_skynet/system"
 file_errorlog="$dir_skynet/error.log"
@@ -95,7 +96,7 @@ file_reloadasn="$dir_system/reloadasn"
 file_sleep="$dir_system/sleep"
 file_temp="$dir_system/temp"
 file_tempset="$dir_system/tempset"
-mkdir -p "$dir_cache" "$dir_reload" "$dir_system"
+mkdir -p "$dir_cache1" "$dir_cache2" "$dir_reload" "$dir_system"
 
 
 if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
@@ -350,7 +351,7 @@ Load_Whitelist () {
 		wait
 		# Whitelist root hints:
 		local url="http://www.internic.net/domain/named.root"
-		local file="$dir_system/named.root"
+		local file="$dir_cache2/named.root"
 		local response_code
 		if response_code=$(curl -fsL --retry 4 $url --output "$file_temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 			mv -f "$file_temp" "$file"
@@ -459,7 +460,7 @@ Download_Set () {
 				continue
 			fi
 
-			file="$dir_cache/$setname"
+			file="$dir_cache1/$setname"
 			if response_code=$(curl -fsL --retry 4 $url --output "$file_temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 				mv -f "$file_temp" "$file"
 				Load_Set
@@ -488,7 +489,7 @@ Download_Set () {
 				ipset -q destroy "$setname"
 			fi
 		done
-		for dir in "$dir_cache" "$dir_reload"; do
+		for dir in "$dir_cache1" "$dir_reload"; do
 			cd "$dir"
 			for setname in $(ls -1t); do
 				if ! echo "$list" | grep -q "$setname"; then
@@ -610,9 +611,9 @@ case "$command" in
 			echo " Blacklist                                   Last download "
 			echo "-----------------------------------------------------------"
 			lookup=$(ipset list Skynet-Master | Filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
-			cd "$dir_cache"
+			cd "$dir_cache1"
 			for setname in $(ls -1t | Filter_Skynet_Set); do
-				printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(File_Age "$dir_cache/$setname")"
+				printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(File_Age "$dir_cache1/$setname")"
 			done
 		;;
 
@@ -647,4 +648,4 @@ esac
 
 
 echo "-----------------------------------------------------------"
-printf " %-25s  %30s\n\n" "Uptime $(File_Age "$file_installtime")" "$(if [ -f "$file_reload" ] || [ -f "$file_reloadasn" ] || [ $(ls -1 "$dir_reload" | Filter_Skynet_Set | wc -l) -ge 1 ]; then echo "[i] Reload downloads queued"; fi)"
+printf " %-25s  %30s\n\n" "Uptime $(File_Age "$file_installtime")" "$(if [ -f "$file_reload" ] || [ -f "$file_reloadasn" ] || [ $(ls -1 "$dir_reload" | Filter_Skynet_Set | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
