@@ -350,13 +350,14 @@ Load_Whitelist () {
 		done
 		wait
 		# Whitelist root hints:
-		local url="http://www.internic.net/domain/named.root"
 		local file="$dir_cache2/named.root"
 		local response_code
-		if response_code=$(curl -fsL --retry 4 $url --output "$file_temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
+		if response_code=$(curl -fsL --retry 4 "http://www.internic.net/domain/named.root" --output "$file_temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 			mv -f "$file_temp" "$file"
 		fi
-		< "$file" Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' >> "$file_tempset"
+		if [ -f "$file" ]; then
+			< "$file" Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' >> "$file_tempset"
+		fi
 		# Swap to Skynet-Whitelist:
 		ipset -q destroy "Skynet-Temp"
 		ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$file_tempset") + 8))" comment
