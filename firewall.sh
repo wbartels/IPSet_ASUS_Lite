@@ -401,7 +401,7 @@ Load_ASN () {
 		echo -n "" > "$file_tempset"
 		local asn n=0
 		for asn in $(echo "$blacklist_asn" | Filter_ASN); do
-			(	# subshell
+			(	# Subshell
 				set -o pipefail; curl -fsL --retry 4 "https://ipinfo.io/$asn" | Filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$file_tempset"
 				if [ $? -ne 0 ]; then
 					logger -st Skynet "[*] Download error https://ipinfo.io/$asn"
@@ -424,7 +424,7 @@ Load_ASN () {
 
 Load_Set () {
 		logger -st Skynet "[i] Update $comment"
-		# use global setname, comment and file
+		# Use global setname, comment and file
 		if ! ipset list -n "$setname" >/dev/null 2>&1; then
 			ipset create "$setname" hash:net hashsize 64 maxelem 262144 comment
 			ipset add Skynet-Master "$setname" comment "$comment"
@@ -439,7 +439,7 @@ Load_Set () {
 
 Download_Set () {
 		echo "$blacklist_set" | Filter_URL_Line | while IFS= read -r line; do
-			# subshell
+			# Subshell
 			url=$(echo "$line" | Filter_URL)
 			comment=$(echo "$line" | Filter_Comment)
 			update_cycles=$(echo "$line" | Filter_Update_Cycles)
@@ -594,13 +594,15 @@ case "$command" in
 				updatecount=$(head -1 "$file_updatecount" 2>/dev/null)
 				updatecount=$((updatecount + 1))
 				echo "$updatecount" > "$file_updatecount"
+			else
+				# All sets will be updated: updatecount=0
+				rm -f "$dir_reload/"*
 			fi
 			Load_Whitelist
 			Load_Blacklist
 			Load_Domain
 			Load_ASN
 			Download_Set
-			rm -f "$dir_reload/all"
 		;;
 
 
