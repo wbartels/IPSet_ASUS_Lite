@@ -544,6 +544,7 @@ case "$command" in
 			echo "-----------------------------------------------------------"
 			logger -st Skynet "[i] Install"
 			rm -f "$dir_system/"*
+			rm -f "$dir_reload/"*
 			touch "$file_installtime"
 			touch "$file_errorlog"
 			echo 0 > "$file_updatecount"
@@ -645,4 +646,4 @@ esac
 
 
 echo "-----------------------------------------------------------"
-printf " %-25s  %30s\n\n" "Uptime $(File_Age "$file_installtime")" "$(if [ $(ls -1 "$dir_reload" | Filter_Skynet_Set | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
+printf " %-25s  %30s\n\n" "Uptime $(File_Age "$file_installtime")" "$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
