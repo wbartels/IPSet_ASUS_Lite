@@ -91,8 +91,6 @@ dir_system="$dir_skynet/system"
 file_errorlog="$dir_skynet/error.log"
 file_installtime="$dir_system/installtime"
 file_updatecount="$dir_system/updatecount"
-file_reload="$dir_system/reload"
-file_reloadasn="$dir_system/reloadasn"
 file_sleep="$dir_system/sleep"
 file_temp="$dir_system/temp"
 file_tempset="$dir_system/tempset"
@@ -109,7 +107,7 @@ while [ "$(nvram get ntp_ready)" = "0" ]; do
 		if [ $i -eq 0 ]; then logger -st Skynet "[i] Waiting for NTP to sync..."; fi
 		if [ $i -eq 300 ]; then
 			logger -st Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!";
-			touch "$file_reload"
+			touch "$dir_reload/all"
 			echo; exit 1;
 		fi
 		i=$((i + 1)); sleep 1
@@ -125,7 +123,7 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 			if [ $i -eq 6 ]; then
 				logger -st Skynet "[*] Internet connectivity error"
 				echo "$(date) | Internet connectivity error" >> "$file_errorlog"
-				touch "$file_reload"
+				touch "$dir_reload/all"
 				echo; exit 1
 			fi
 			sleep 7
@@ -397,9 +395,9 @@ Load_Domain () {
 
 
 Load_ASN () {
-		[ $((updatecount % 48)) -ne 0 ] && [ ! -f "$file_reloadasn" ] && return
+		[ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ] && return
 		logger -st Skynet "[i] Update blacklist_asn"
-		rm -f "$file_reloadasn"
+		rm -f "$dir_reload/asn"
 		echo -n "" > "$file_tempset"
 		local asn n=0
 		for asn in $(echo "$blacklist_asn" | Filter_ASN); do
@@ -408,14 +406,14 @@ Load_ASN () {
 				if [ $? -ne 0 ]; then
 					logger -st Skynet "[*] Download error https://ipinfo.io/$asn"
 					echo "$(date) | Download error | https://ipinfo.io/$asn" >> "$file_errorlog"
-					touch "$file_reloadasn"
+					touch "$dir_reload/asn"
 				fi
 			) &
 			n=$((n + 1)); [ $((n % 10)) -eq 0 ] && wait
-			[ -f "$file_reloadasn" ] && return
+			[ -f "$dir_reload/asn" ] && return
 		done
 		wait
-		[ -f "$file_reloadasn" ] && return
+		[ -f "$dir_reload/asn" ] && return
 		ipset -q destroy "Skynet-Temp"
 		ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$file_tempset") + 8))" comment
 		ipset restore -! -f "$file_tempset"
@@ -490,13 +488,11 @@ Download_Set () {
 				ipset -q destroy "$setname"
 			fi
 		done
-		for dir in "$dir_cache1" "$dir_reload"; do
-			cd "$dir"
-			for setname in $(ls -1t); do
-				if ! echo "$list" | grep -q "$setname"; then
-					rm -f "$dir/$setname"
-				fi
-			done
+		cd "$dir_cache1"
+		for setname in $(ls -1t); do
+			if ! echo "$list" | grep -q "$setname"; then
+				rm -f "$dir/$setname"
+			fi
 		done
 }
 
@@ -593,7 +589,7 @@ case "$command" in
 			echo "-----------------------------------------------------------"
 			echo " Update                                                    "
 			echo "-----------------------------------------------------------"
-			if [ "$option" = "cru" ] && [ ! -f "$file_reload" ]; then
+			if [ "$option" = "cru" ] && [ ! -f "$dir_reload/all" ]; then
 				updatecount=$(head -1 "$file_updatecount" 2>/dev/null)
 				updatecount=$((updatecount + 1))
 				echo "$updatecount" > "$file_updatecount"
@@ -603,7 +599,7 @@ case "$command" in
 			Load_Domain
 			Load_ASN
 			Download_Set
-			rm -f "$file_reload"
+			rm -f "$dir_reload/all"
 		;;
 
 
@@ -649,4 +645,4 @@ esac
 
 
 echo "-----------------------------------------------------------"
-printf " %-25s  %30s\n\n" "Uptime $(File_Age "$file_installtime")" "$(if [ -f "$file_reload" ] || [ -f "$file_reloadasn" ] || [ $(ls -1 "$dir_reload" | Filter_Skynet_Set | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
+printf " %-25s  %30s\n\n" "Uptime $(File_Age "$file_installtime")" "$(if [ $(ls -1 "$dir_reload" | Filter_Skynet_Set | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
