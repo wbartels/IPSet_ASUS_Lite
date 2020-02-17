@@ -65,7 +65,7 @@ blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.tx
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
 					<stopforumspam_1day>			https://iplists.firehol.org/files/stopforumspam_1d.ipset  {1}
 					<stopforumspam_toxic>			https://www.stopforumspam.com/downloads/toxic_ip_cidr.txt  {1}
-					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset
+					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
 					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
 blacklist_ip=""
 blacklist_domain=""
@@ -90,10 +90,10 @@ dir_reload="$dir_skynet/reload"
 dir_system="$dir_skynet/system"
 file_errorlog="$dir_skynet/error.log"
 file_installtime="$dir_system/installtime"
-file_updatecount="$dir_system/updatecount"
+file_ipset="$dir_system/ipset"
 file_sleep="$dir_system/sleep"
 file_temp="$dir_system/temp"
-file_tempset="$dir_system/tempset"
+file_updatecount="$dir_system/updatecount"
 mkdir -p "$dir_cache1" "$dir_cache2" "$dir_reload" "$dir_system"
 
 
@@ -328,7 +328,7 @@ File_Age () {
 Load_Whitelist () {
 		[ $((updatecount % 48)) -ne 0 ] && return
 		logger -st Skynet "[i] Update whitelist"
-		true > "$file_tempset"
+		true > "$file_ipset"
 		# Whitelist router:
 		echo "add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback_ipaddr\"
 		add Skynet-Temp $(LAN_CIDR_Lookup $(nvram get lan_ipaddr)) comment \"Whitelist: lan_ipaddr\"
@@ -337,13 +337,13 @@ Load_Whitelist () {
 		add Skynet-Temp $(nvram get wan0_dns | awk '{print $1}') comment \"Whitelist: wan0_dns\"
 		add Skynet-Temp $(nvram get wan0_dns | awk '{print $2}') comment \"Whitelist: wan0_dns\"
 		add Skynet-Temp $(nvram get dhcp_dns1_x) comment \"Whitelist: dhcp_dns1_x\"
-		add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"" | tr -d '\t' | Filter_IP_Line >> "$file_tempset"
+		add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"" | tr -d '\t' | Filter_IP_Line >> "$file_ipset"
 		# Whitelist ip:
-		echo "$whitelist_ip" | Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$file_tempset"
+		echo "$whitelist_ip" | Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$file_ipset"
 		# Whitelist domain:
 		local domain n=0
 		for domain in $(echo "internic.net ipinfo.io $whitelist_domain $(echo "$blacklist_set" | Strip_Domain) $(nvram get ntp_server0) $(nvram get ntp_server1)" | Filter_Domain); do
-			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$file_tempset" &
+			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$file_ipset" &
 			n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 		done
 		wait
@@ -354,12 +354,12 @@ Load_Whitelist () {
 			mv -f "$file_temp" "$file"
 		fi
 		if [ -f "$file" ]; then
-			< "$file" Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' >> "$file_tempset"
+			< "$file" Filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' >> "$file_ipset"
 		fi
 		# Swap to Skynet-Whitelist:
 		ipset -q destroy "Skynet-Temp"
-		ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$file_tempset") + 8))" comment
-		ipset restore -! -f "$file_tempset"
+		ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$file_ipset") + 8))" comment
+		ipset restore -! -f "$file_ipset"
 		ipset swap "Skynet-Whitelist" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
 }
@@ -379,16 +379,16 @@ Load_Blacklist () {
 Load_Domain () {
 		[ $((updatecount % 48)) -ne 0 ] && return
 		logger -st Skynet "[i] Update blacklist_domain"
-		true > "$file_tempset"
+		true > "$file_ipset"
 		local domain n=0
 		for domain in $(echo "$blacklist_domain" | Filter_Domain); do
-			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$file_tempset" &
+			Domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$file_ipset" &
 			n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 		done
 		wait
 		ipset -q destroy "Skynet-Temp"
-		ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$file_tempset") + 8))" comment
-		ipset restore -! -f "$file_tempset"
+		ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$file_ipset") + 8))" comment
+		ipset restore -! -f "$file_ipset"
 		ipset swap "Skynet-Domain" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
 }
@@ -398,11 +398,11 @@ Load_ASN () {
 		[ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ] && return
 		logger -st Skynet "[i] Update blacklist_asn"
 		rm -f "$dir_reload/asn"
-		echo -n "" > "$file_tempset"
+		echo -n "" > "$file_ipset"
 		local asn n=0
 		for asn in $(echo "$blacklist_asn" | Filter_ASN); do
 			(	# Subshell
-				set -o pipefail; curl -fsL --retry 4 "https://ipinfo.io/$asn" | Filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$file_tempset"
+				set -o pipefail; curl -fsL --retry 4 "https://ipinfo.io/$asn" | Filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$file_ipset"
 				if [ $? -ne 0 ]; then
 					logger -st Skynet "[*] Download error https://ipinfo.io/$asn"
 					echo "$(date) | Download error | https://ipinfo.io/$asn" >> "$file_errorlog"
@@ -415,8 +415,8 @@ Load_ASN () {
 		wait
 		[ -f "$dir_reload/asn" ] && return
 		ipset -q destroy "Skynet-Temp"
-		ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$file_tempset") + 8))" comment
-		ipset restore -! -f "$file_tempset"
+		ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$file_ipset") + 8))" comment
+		ipset restore -! -f "$file_ipset"
 		ipset swap "Skynet-ASN" "Skynet-Temp"
 		ipset destroy "Skynet-Temp"
 }
@@ -595,7 +595,6 @@ case "$command" in
 				updatecount=$((updatecount + 1))
 				echo "$updatecount" > "$file_updatecount"
 			else
-				# All sets will be updated: updatecount=0
 				rm -f "$dir_reload/"*
 			fi
 			Load_Whitelist
