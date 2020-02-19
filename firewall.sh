@@ -398,7 +398,7 @@ Load_ASN () {
 		[ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ] && return
 		logger -st Skynet "[i] Update blacklist_asn"
 		rm -f "$dir_reload/asn"
-		echo -n "" > "$file_ipset"
+		true > "$file_ipset"
 		local asn n=0
 		for asn in $(echo "$blacklist_asn" | Filter_ASN); do
 			(	# Subshell
