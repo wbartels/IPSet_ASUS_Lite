@@ -497,21 +497,37 @@ Download_Set () {
 }
 
 
+Header () {
+	[ "$option" = "cru" ] && return
+	clear
+	sed -n '2,7s/#//p' "$0"
+	echo " Skynet Lite by Willem Bartels"
+	echo " Code based on Skynet By Adamm"
+	echo
+	if [ -n "$1" ] || [ -n "$2" ]; then
+		echo "-----------------------------------------------------------"
+		printf " %-25s  %30s\n" "$1" "$2"
+		echo "-----------------------------------------------------------"
+	fi
+}
+
+
+Footer () {
+	[ "$option" = "cru" ] && return
+	echo "-----------------------------------------------------------"
+	printf " %-25s  %30s\n\n" "Uptime $(File_Age "$file_installtime")" "$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
+}
+
+
 #######################
 #- Start Skynet Lite -#
 #######################
 
 
-clear
-sed -n '2,7s/#//p' "$0"
-echo " Skynet Lite by Willem Bartels"
-echo " Code based on Skynet By Adamm"
-echo
-
-
 ip=$(echo "$command" | Is_IP) || ip="noip"
 case "$command" in
 		"uninstall")
+			Header
 			logger -st Skynet "[*] Uninstall Skynet Lite"
 			if [ -f "/jffs/scripts/firewall-start" ]; then
 				chmod 755 "/jffs/scripts/firewall-start"
@@ -524,24 +540,23 @@ case "$command" in
 			Unload_IPSets
 			rm -fr "$dir_skynet"
 			rm -f "$lockfile" "$0"
-			echo; exit 0;
+			echo
 		;;
 
 
 		"error")
+			Header
 			if [ -f "$file_errorlog" ] && [ $(wc -l < "$file_errorlog") -ge 1 ]; then
 				cat "$file_errorlog"
 			else
 				echo "Empty error log"
 			fi
-			echo; exit 0;
+			echo
 		;;
 
 
 		"reset")
-			echo "-----------------------------------------------------------"
-			echo " Reset                                                     "
-			echo "-----------------------------------------------------------"
+			Header "Reset"
 			logger -st Skynet "[i] Install"
 			rm -f "$dir_system/"*
 			rm -f "$dir_reload/"*
@@ -583,13 +598,12 @@ case "$command" in
 			Load_Domain
 			Load_ASN
 			Download_Set
+			Footer
 		;;
 
 
 		"update")
-			echo "-----------------------------------------------------------"
-			echo " Update                                                    "
-			echo "-----------------------------------------------------------"
+			Header "Update"
 			if [ "$option" = "cru" ] && [ ! -f "$dir_reload/all" ]; then
 				updatecount=$(head -1 "$file_updatecount" 2>/dev/null)
 				updatecount=$((updatecount + 1))
@@ -602,25 +616,23 @@ case "$command" in
 			Load_Domain
 			Load_ASN
 			Download_Set
+			Footer
 		;;
 
 
 		"fresh")
-			echo "-----------------------------------------------------------"
-			echo " Blacklist                                   Last download "
-			echo "-----------------------------------------------------------"
+			Header "Blacklist" "Last download"
 			lookup=$(ipset list Skynet-Master | Filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
 			cd "$dir_cache1"
 			for setname in $(ls -1t | Filter_Skynet_Set); do
 				printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(File_Age "$dir_cache1/$setname")"
 			done
+			Footer
 		;;
 
 
 		"$ip")
-			echo "-----------------------------------------------------------"
-			echo " Search for $ip"
-			echo "-----------------------------------------------------------"
+			Header "Search for $ip"
 			if ipset -q test "Skynet-Whitelist" "$ip"; then
 				echo " [*] whitelist"
 			else
@@ -634,17 +646,13 @@ case "$command" in
 					echo " [ ] $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
 				fi
 			done
+			Footer
 		;;
 
 
 		*)
-			echo "-----------------------------------------------------------"
-			echo " Blacklist                                         Blocked "
-			echo "-----------------------------------------------------------"
+			Header "Blacklist" "Blocked"
 			ipset list Skynet-Master | Filter_Skynet | tr -d '"' | sort -k3,3gr -k7,7 | awk '{printf " %-40s  %15s\n", $7, $3}'
+			Footer
 		;;
 esac
-
-
-echo "-----------------------------------------------------------"
-printf " %-25s  %30s\n\n" "Uptime $(File_Age "$file_installtime")" "$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
