@@ -12,7 +12,7 @@ This script will always be open source and free to use, but if you want to suppo
 In your favorite SSH Client;
 
 ```Shell
-curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && sh /jffs/scripts/firewall
+curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && sh /jffs/scripts/firewall
 ```
 
 ## Help
