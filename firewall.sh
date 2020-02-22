@@ -526,35 +526,6 @@ Footer () {
 
 ip=$(echo "$command" | Is_IP) || ip="noip"
 case "$command" in
-		"uninstall")
-			Header
-			logger -st Skynet "[*] Uninstall Skynet Lite"
-			if [ -f "/jffs/scripts/firewall-start" ]; then
-				chmod 755 "/jffs/scripts/firewall-start"
-				config=$(grep -v "/jffs/scripts/firewall" "/jffs/scripts/firewall-start")
-				echo "$config" > "/jffs/scripts/firewall-start"
-			fi
-			cru d Skynet_update
-			Unload_IPTables
-			Unload_LogIPTables
-			Unload_IPSets
-			rm -fr "$dir_skynet"
-			rm -f "$lockfile" "$0"
-			echo
-		;;
-
-
-		"error")
-			Header
-			if [ -f "$file_errorlog" ] && [ $(wc -l < "$file_errorlog") -ge 1 ]; then
-				cat "$file_errorlog"
-			else
-				echo "Empty error log"
-			fi
-			echo
-		;;
-
-
 		"reset")
 			Header "Reset"
 			logger -st Skynet "[i] Install"
@@ -617,6 +588,35 @@ case "$command" in
 			Load_ASN
 			Download_Set
 			Footer
+		;;
+
+
+		"uninstall")
+			Header
+			logger -st Skynet "[*] Uninstall Skynet Lite"
+			if [ -f "/jffs/scripts/firewall-start" ]; then
+				chmod 755 "/jffs/scripts/firewall-start"
+				config=$(grep -v "/jffs/scripts/firewall" "/jffs/scripts/firewall-start")
+				echo "$config" > "/jffs/scripts/firewall-start"
+			fi
+			cru d Skynet_update
+			Unload_IPTables
+			Unload_LogIPTables
+			Unload_IPSets
+			rm -fr "$dir_skynet"
+			rm -f "$lockfile" "$0"
+			echo
+		;;
+
+
+		"error")
+			Header
+			if [ -f "$file_errorlog" ] && [ $(wc -l < "$file_errorlog") -ge 1 ]; then
+				cat "$file_errorlog"
+			else
+				echo "Empty error log"
+			fi
+			echo
 		;;
 
 
