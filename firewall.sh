@@ -7,7 +7,7 @@
 #
 #   Skynet Lite by Willem Bartels
 #   IP Blocking For ASUS Routers Using IPSet
-#   https://github.com/wbartels/IPSet_ASUS
+#   https://github.com/wbartels/IPSet_ASUS_Lite
 #
 #   Code based on Skynet By Adamm
 #   Advanced IP Blocking For ASUS Routers Using IPSet
@@ -16,7 +16,7 @@
 #
 #
 # Installation:
-# curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && sh /jffs/scripts/firewall
+# curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && sh /jffs/scripts/firewall
 #
 # Commands:
 # firewall
