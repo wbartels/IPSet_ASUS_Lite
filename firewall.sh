@@ -105,9 +105,10 @@ fi
 
 i=0
 while [ "$(nvram get ntp_ready)" = "0" ]; do
-	if [ $i -eq 0 ]; then logger -st Skynet "[i] Waiting for NTP to sync..."; fi
+	if [ $i -eq 0 ]; then logger -st skynet "[i] Waiting for NTP to sync..."; fi
 	if [ $i -eq 300 ]; then
-		logger -st Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!";
+		logger -st skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!";
+		echo "unknown time | NTP failed to start after 5 minutes - Please fix immediately!" >> "$file_errorlog"
 		touch "$dir_reload/all"
 		echo; exit 1;
 	fi
@@ -120,9 +121,9 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 		if ping -q -w1 -c1 google.com >/dev/null 2>&1; then break; fi
 		if ping -q -w1 -c1 github.com >/dev/null 2>&1; then break; fi
 		if ping -q -w1 -c1 amazon.com >/dev/null 2>&1; then break; fi
-		if [ $i -eq 1 ]; then logger -st Skynet "[i] Waiting for internet connectivity..."; fi
+		if [ $i -eq 1 ]; then logger -st skynet "[i] Waiting for internet connectivity..."; fi
 		if [ $i -eq 6 ]; then
-			logger -st Skynet "[*] Internet connectivity error"
+			logger -st skynet "[*] Internet connectivity error"
 			echo "$(date) | Internet connectivity error" >> "$file_errorlog"
 			touch "$dir_reload/all"
 			echo; exit 1
@@ -145,7 +146,7 @@ lockfile="/tmp/var/lock/skynet.lock"
 exec 99>$lockfile
 flock -n 99
 if [ $? -ne 0 ]; then
-	echo "An instance of Skynet Lite is already running"; echo; exit 1
+	echo "[i] An instance of Skynet Lite is already running"; echo; exit 1
 fi
 
 
@@ -236,11 +237,19 @@ unload_IPSets () {
 }
 
 
+log_Skynet () {
+	logger -t skynet "$1"
+	echo " $1" >&2
+	if [ "$(echo "$1" | cut -c1-3)" = "[*]" ]; then
+		echo "$(date) | $(echo "$1" | cut -c5-)" >> "$file_errorlog"
+	fi
+}
+
+
 domain_Lookup () {
 	set -o pipefail; nslookup "$1" 2>/dev/null | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk 'NR>2'
 	if [ $? -ne 0 ]; then
-		logger -st Skynet "[*] DNS lookup failed for $1"
-		echo "$(date) | DNS lookup failed | $1" >> "$file_errorlog"
+		log_Skynet "[*] DNS cannot resolve $1"
 	fi
 }
 
@@ -300,7 +309,7 @@ filter_Skynet_Set () {
 }
 
 
-Is_IP () {
+is_IP () {
 	grep -oE '^((25[0-4]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[1-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})$'
 }
 
@@ -330,7 +339,7 @@ file_Age () {
 
 load_Whitelist () {
 	[ $((updatecount % 48)) -ne 0 ] && return
-	logger -st Skynet "[i] Update whitelist"
+	log_Skynet "[i] Update whitelist"
 	true > "$file_ipset"
 	# Whitelist router:
 	echo "add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback_ipaddr\"
@@ -370,7 +379,7 @@ load_Whitelist () {
 
 load_Blacklist () {
 	[ "$option" = "cru" ] && return
-	logger -st Skynet "[i] Update blacklist_ip/cidr"
+	log_Skynet "[i] Update blacklist_ip/cidr"
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net hashsize "$(($(echo "$blacklist_ip" | wc -l) + 8))" comment
 	echo "$blacklist_ip" | filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' | ipset restore -!
@@ -381,7 +390,7 @@ load_Blacklist () {
 
 load_Domain () {
 	[ $((updatecount % 48)) -ne 0 ] && return
-	logger -st Skynet "[i] Update blacklist_domain"
+	log_Skynet "[i] Update blacklist_domain"
 	true > "$file_ipset"
 	local domain n=0
 	for domain in $(echo "$blacklist_domain" | filter_Domain); do
@@ -399,16 +408,15 @@ load_Domain () {
 
 load_ASN () {
 	[ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ] && return
-	logger -st Skynet "[i] Update blacklist_asn"
+	log_Skynet "[i] Update blacklist_asn"
 	rm -f "$dir_reload/asn"
 	true > "$file_ipset"
 	local asn n=0
 	for asn in $(echo "$blacklist_asn" | filter_ASN); do
-		(	# Subshell
+		(
 			set -o pipefail; curl -fsL --retry 4 "https://ipinfo.io/$asn" | filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$file_ipset"
 			if [ $? -ne 0 ]; then
-				logger -st Skynet "[*] Download error https://ipinfo.io/$asn"
-				echo "$(date) | Download error | https://ipinfo.io/$asn" >> "$file_errorlog"
+				log_Skynet "[*] Download error https://ipinfo.io/$asn"
 				touch "$dir_reload/asn"
 			fi
 		) &
@@ -426,7 +434,7 @@ load_ASN () {
 
 
 load_Set () {
-	logger -st Skynet "[i] Update $comment"
+	log_Skynet "[i] Update $comment"
 	# Use global setname, comment and file
 	if ! ipset list -n "$setname" >/dev/null 2>&1; then
 		ipset create "$setname" hash:net hashsize 64 maxelem 262144 comment
@@ -469,10 +477,9 @@ download_Set () {
 		elif [ "$response_code" = "304" ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
 			load_Set
 		elif [ "$response_code" = "304" ]; then
-			logger -st Skynet "[-] Fresh $comment"
+			echo " [i] Fresh $comment"
 		else
-			logger -st Skynet "[*] Download error $url"
-			echo "$(date) | Download error | $response_code | $url" >> "$file_errorlog"
+			log_Skynet "[*] Download error $response_code $url"
 			touch "$dir_reload/$setname"
 		fi
 	done
@@ -486,7 +493,7 @@ download_Set () {
 	done
 	for setname in $(echo "$lookup" | sort -k2 | awk '{print $1}'); do
 		if ! echo "$list" | grep -q "$setname"; then
-			logger -st Skynet "[i] Unload $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
+			log_Skynet "[i] Unload $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
 			ipset -q del "Skynet-Master" "$setname"
 			ipset -q destroy "$setname"
 		fi
@@ -527,11 +534,11 @@ footer () {
 #######################
 
 
-ip=$(echo "$command" | Is_IP) || ip="noip"
+ip=$(echo "$command" | is_IP) || ip="noip"
 case "$command" in
 	reset)
 		header "Reset"
-		logger -st Skynet "[i] Install"
+		log_Skynet "[i] Install"
 		rm -f "$dir_system/"*
 		rm -f "$dir_reload/"*
 		touch "$file_installtime"
@@ -539,7 +546,7 @@ case "$command" in
 		echo 0 > "$file_updatecount"
 		if [ "$0" != "/jffs/scripts/firewall" ]; then
 			mv -f "$0" "/jffs/scripts/firewall"
-			logger -st Skynet "[i] Skynet Lite moved to /jffs/scripts/firewall"
+			log_Skynet "[i] Skynet Lite moved to /jffs/scripts/firewall"
 		fi
 		if [ ! -f "/jffs/scripts/firewall-start" ]; then
 			echo "#!/bin/sh
@@ -596,7 +603,7 @@ case "$command" in
 
 	uninstall)
 		header "Uninstall"
-		logger -st Skynet "[*] Uninstall Skynet Lite"
+		log_Skynet "[*] Uninstall Skynet Lite"
 		if [ -f "/jffs/scripts/firewall-start" ]; then
 			chmod 755 "/jffs/scripts/firewall-start"
 			config=$(grep -v "/jffs/scripts/firewall" "/jffs/scripts/firewall-start")
@@ -613,7 +620,7 @@ case "$command" in
 
 
 	error)
-		header ""
+		header
 		if [ -f "$file_errorlog" ] && [ $(wc -l < "$file_errorlog") -ge 1 ]; then
 			cat "$file_errorlog"
 		else
@@ -637,14 +644,14 @@ case "$command" in
 	"$ip")
 		header "Search for $ip"
 		if ipset -q test "Skynet-Whitelist" "$ip"; then
-			echo " [+] whitelist"
+			echo " [*] whitelist"
 		else
 			echo " [ ] whitelist"
 		fi
 		lookup=$(ipset list Skynet-Master | filter_Skynet | tr -d '"' | awk '{print $1, $7}')
 		for setname in $(echo "$lookup" | sort -k2 | awk '{print $1}'); do
 			if ipset -q test "$setname" "$ip"; then
-				echo " [+] $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
+				echo " [*] $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
 			else
 				echo " [ ] $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
 			fi
