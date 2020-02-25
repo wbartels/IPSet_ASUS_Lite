@@ -54,6 +54,7 @@ blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.tx
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
 					<cleantalk_1day>				https://iplists.firehol.org/files/cleantalk_1d.ipset
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {1}
+					<feodo_tracker>					https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt  {1}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
 					<maxmind_proxy_fraud>			https://iplists.firehol.org/files/maxmind_proxy_fraud.ipset  {12}
 					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
@@ -63,6 +64,7 @@ blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.tx
 					<normshield_high_webscan>		https://iplists.firehol.org/files/normshield_high_webscan.ipset
 					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
+					<ssl_blacklist>					https://sslbl.abuse.ch/blacklist/sslipblacklist.txt  {1}
 					<stopforumspam_1day>			https://iplists.firehol.org/files/stopforumspam_1d.ipset  {1}
 					<stopforumspam_toxic>			https://www.stopforumspam.com/downloads/toxic_ip_cidr.txt  {1}
 					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
@@ -359,8 +361,8 @@ load_Whitelist () {
 	done
 	wait
 	# Whitelist root hints:
-	local file="$dir_cache2/named.root"
 	local response_code
+	local file="$dir_cache2/named.root"
 	if response_code=$(curl -fsL --retry 4 "http://www.internic.net/domain/named.root" --output "$dir_temp/download" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 		mv -f "$dir_temp/download" "$file"
 	fi
@@ -434,7 +436,6 @@ load_ASN () {
 
 load_Set () {
 	log_Skynet "[i] Update $comment"
-	# Use global setname, comment and file
 	if ! ipset list -n "$setname" >/dev/null 2>&1; then
 		ipset create "$setname" hash:net hashsize 64 maxelem 262144 comment
 		ipset add Skynet-Master "$setname" comment "$comment"
@@ -448,12 +449,13 @@ load_Set () {
 
 
 download_Set () {
-	echo "$blacklist_set" | filter_URL_Line | while IFS= read -r line; do
-		# Subshell
-		url=$(echo "$line" | filter_URL)
-		comment=$(echo "$line" | filter_Comment)
-		update_cycles=$(echo "$line" | filter_Update_Cycles)
-		setname="Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
+	local freshcount=0
+	echo "$blacklist_set" | filter_URL_Line > "$dir_temp/blacklist_set"
+	while IFS= read -r line; do
+		local url=$(echo "$line" | filter_URL)
+		local comment=$(echo "$line" | filter_Comment)
+		local update_cycles=$(echo "$line" | filter_Update_Cycles)
+		local setname="Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
 
 		if [ -z "$comment" ]; then
 			comment=$(basename "$url")
@@ -469,7 +471,8 @@ download_Set () {
 			continue
 		fi
 
-		file="$dir_cache1/$setname"
+		local response_code
+		local file="$dir_cache1/$setname"
 		if response_code=$(curl -fsL --retry 4 $url --output "$dir_temp/download" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 			mv -f "$dir_temp/download" "$file"
 			load_Set
@@ -477,16 +480,21 @@ download_Set () {
 			load_Set
 		elif [ "$response_code" = "304" ]; then
 			echo " [i] Fresh $comment"
+			freshcount=$((freshcount + 1))
 		else
 			log_Skynet "[*] Download error $response_code $url"
 			touch "$dir_reload/$setname"
 		fi
-	done
+	done < "$dir_temp/blacklist_set"
 
-	# Unload unlisted set
-	[ "$option" = "cru" ] && return
+	if [ "$option" = "cru" ] && [ $freshcount -ge 1 ]; then
+		log_Skynet "[i] Update $freshcount fresh cache sets"
+		return
+	fi
+
+	# Unload unlisted sets
+	local url list="" setname
 	local lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
-	local url list="" setname dir
 	for url in $(echo "$blacklist_set" | filter_URL); do
 		list="$list Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
 	done
