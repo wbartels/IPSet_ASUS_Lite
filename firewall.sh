@@ -342,8 +342,12 @@ load_Whitelist () {
 	[ $((updatecount % 48)) -ne 0 ] && return
 	log_Skynet "[i] Update whitelist"
 	true > "$dir_temp/ipset"
-	# Whitelist router:
+	# Whitelist router, loopback and static DNS:
 	echo "add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback_ipaddr\"
+	add Skynet-Temp 8.8.8.8 comment \"Whitelist: Google Public DNS\"
+	add Skynet-Temp 8.8.4.4 comment \"Whitelist: Google Public DNS\"
+	add Skynet-Temp 1.1.1.1 comment \"Whitelist: Cloudflare DNS\"
+	add Skynet-Temp 1.0.0.1 comment \"Whitelist: Cloudflare DNS\"
 	add Skynet-Temp $(lan_CIDR_Lookup $(nvram get lan_ipaddr)) comment \"Whitelist: lan_ipaddr\"
 	add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Whitelist: wan0_ipaddr\"
 	add Skynet-Temp $(nvram get wan0_gateway) comment \"Whitelist: wan0_gateway\"
