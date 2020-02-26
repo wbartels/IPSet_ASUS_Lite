@@ -50,11 +50,10 @@ logmode="enabled"
 loginvalid="disabled"
 
 
-blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
+blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic
+					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
-					<cleantalk_1day>				https://iplists.firehol.org/files/cleantalk_1d.ipset
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {1}
-					<feodo_tracker>					https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt  {1}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
 					<maxmind_proxy_fraud>			https://iplists.firehol.org/files/maxmind_proxy_fraud.ipset  {12}
 					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
@@ -64,8 +63,6 @@ blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.tx
 					<normshield_high_webscan>		https://iplists.firehol.org/files/normshield_high_webscan.ipset
 					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
-					<ssl_blacklist>					https://sslbl.abuse.ch/blacklist/sslipblacklist.txt  {1}
-					<stopforumspam_1day>			https://iplists.firehol.org/files/stopforumspam_1d.ipset  {1}
 					<stopforumspam_toxic>			https://www.stopforumspam.com/downloads/toxic_ip_cidr.txt  {1}
 					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
 					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
