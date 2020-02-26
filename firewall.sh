@@ -50,7 +50,7 @@ logmode="enabled"
 loginvalid="disabled"
 
 
-blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic
+blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {1}
 					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {1}
@@ -364,7 +364,7 @@ load_Whitelist () {
 	# Whitelist root hints:
 	local response_code
 	local file="$dir_cache2/named.root"
-	if response_code=$(curl -fsL --retry 4 "http://www.internic.net/domain/named.root" --output "$dir_temp/download" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
+	if response_code=$(curl -fsL --retry 3 "http://www.internic.net/domain/named.root" --output "$dir_temp/download" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 		mv -f "$dir_temp/download" "$file"
 	fi
 	if [ -f "$file" ]; then
@@ -383,7 +383,7 @@ load_Blacklist () {
 	[ "$option" = "cru" ] && return
 	log_Skynet "[i] Update blacklist_ip/cidr"
 	ipset -q destroy "Skynet-Temp"
-	ipset create Skynet-Temp hash:net hashsize "$(($(echo "$blacklist_ip" | wc -l) + 8))" comment
+	ipset create Skynet-Temp hash:net hashsize "$(($(echo "$blacklist_ip" | wc -w) + 8))" comment
 	echo "$blacklist_ip" | filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' | ipset restore -!
 	ipset swap "Skynet-Blacklist" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
@@ -416,7 +416,7 @@ load_ASN () {
 	local asn n=0
 	for asn in $(echo "$blacklist_asn" | filter_ASN); do
 		(
-			set -o pipefail; curl -fsL --retry 4 "https://ipinfo.io/$asn" | filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
+			set -o pipefail; curl -fsL --retry 3 "https://ipinfo.io/$asn" | filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
 			if [ $? -ne 0 ]; then
 				log_Skynet "[*] Download error https://ipinfo.io/$asn"
 				touch "$dir_reload/asn"
@@ -474,7 +474,7 @@ download_Set () {
 
 		local response_code
 		local file="$dir_cache1/$setname"
-		if response_code=$(curl -fsL --retry 4 $url --output "$dir_temp/download" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
+		if response_code=$(curl -fsL --retry 3 $url --output "$dir_temp/download" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 			mv -f "$dir_temp/download" "$file"
 			load_Set
 		elif [ "$response_code" = "304" ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
