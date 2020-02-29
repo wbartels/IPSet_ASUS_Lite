@@ -21,8 +21,9 @@
 # Commands:
 # firewall
 # firewall 192.168.1.1
-# firewall fresh
 # firewall update
+# firewall fresh
+# firewall warning
 # firewall error
 # firewall reset
 # firewall uninstall
@@ -53,17 +54,14 @@ loginvalid="disabled"
 blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {1}
 					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
-					<dshield>						https://iplists.firehol.org/files/dshield.netset  {1}
+					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset
+					<cybercrime>					https://iplists.firehol.org/files/cybercrime.ipset
+					<dshield>						https://iplists.firehol.org/files/dshield.netset
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<maxmind_proxy_fraud>			https://iplists.firehol.org/files/maxmind_proxy_fraud.ipset  {12}
+					<maxmind_sample>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
 					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
-					<normshield_high_attack>		https://iplists.firehol.org/files/normshield_high_attack.ipset
-					<normshield_high_bruteforce>	https://iplists.firehol.org/files/normshield_high_bruteforce.ipset
-					<normshield_high_suspicious>	https://iplists.firehol.org/files/normshield_high_suspicious.ipset
-					<normshield_high_webscan>		https://iplists.firehol.org/files/normshield_high_webscan.ipset
 					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
-					<stopforumspam_toxic>			https://www.stopforumspam.com/downloads/toxic_ip_cidr.txt  {1}
 					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
 					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
 blacklist_ip=""
@@ -89,11 +87,13 @@ dir_cache2="$dir_skynet/cache2"
 dir_reload="$dir_skynet/reload"
 dir_system="$dir_skynet/system"
 dir_temp="$dir_skynet/temp"
+dir_update="$dir_skynet/update"
 file_errorlog="$dir_skynet/error.log"
 file_installtime="$dir_system/installtime"
 file_sleep="$dir_system/sleep"
 file_updatecount="$dir_system/updatecount"
-mkdir -p "$dir_cache1" "$dir_cache2" "$dir_reload" "$dir_system" "$dir_temp"
+file_warninglog="$dir_skynet/warning.log"
+mkdir -p "$dir_cache1" "$dir_cache2" "$dir_reload" "$dir_system" "$dir_temp" "$dir_update"
 
 
 if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
@@ -119,7 +119,7 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 		if ping -q -w1 -c1 google.com >/dev/null 2>&1; then break; fi
 		if ping -q -w1 -c1 github.com >/dev/null 2>&1; then break; fi
 		if ping -q -w1 -c1 amazon.com >/dev/null 2>&1; then break; fi
-		if [ $i -eq 1 ]; then logger -st skynet "[i] Waiting for internet connectivity..."; fi
+		if [ $i -eq 1 ]; then logger -st skynet "[!] Waiting for internet connectivity..."; fi
 		if [ $i -eq 6 ]; then
 			logger -st skynet "[*] Internet connectivity error"
 			echo "$(date) | Internet connectivity error" >> "$file_errorlog"
@@ -238,9 +238,10 @@ unload_IPSets () {
 log_Skynet () {
 	logger -t skynet "$1"
 	echo " $1" >&2
-	if [ "$(echo "$1" | cut -c1-3)" = "[*]" ]; then
-		echo "$(date) | $(echo "$1" | cut -c5-)" >> "$file_errorlog"
-	fi
+	local type="$(echo "$1" | cut -c1-3)"
+	local text="$(echo "$1" | cut -c5-)"
+	[ "$type" = "[!]" ] && echo "$(date) | $text" >> "$file_warninglog"
+	[ "$type" = "[*]" ] && echo "$(date) | $text" >> "$file_errorlog"
 }
 
 
@@ -283,7 +284,12 @@ filter_Update_Cycles () {
 
 
 filter_IP_CIDR () {
-	grep -oE '\b(((25[0-4]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[1-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})(\/(3[0-2]|[12]?[0-9]))?)\b'
+	grep -oE '\b(((25[0-4]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})(\/(3[0-2]|[12]?[0-9]))?)\b'
+}
+
+
+filter_PrivateIP () {
+	grep -vE '(^127\.)|(^10\.)|(^172\.1[6-9]\.)|(^172\.2[0-9]\.)|(^172\.3[0-1]\.)|(^192\.168\.)|(^0.)|(^169\.254\.)|(^22[4-9]\.)|(^23[0-9]\.)|(^255\.255\.255\.255)|(^8\.8\.8\.8)|(^8\.8\.4\.4)(^1\.1\.1\.1)|(^1\.0\.0\.1)'
 }
 
 
@@ -339,7 +345,7 @@ load_Whitelist () {
 	[ $((updatecount % 48)) -ne 0 ] && return
 	log_Skynet "[i] Update whitelist"
 	true > "$dir_temp/ipset"
-	# Whitelist router, loopback and static DNS:
+	# Whitelist router, reserved IP addresses and static DNS:
 	echo "add Skynet-Temp $(lan_CIDR_Lookup $(nvram get lan_ipaddr)) comment \"Whitelist: lan_ipaddr\"
 	add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Whitelist: wan0_ipaddr\"
 	add Skynet-Temp $(nvram get wan0_gateway) comment \"Whitelist: wan0_gateway\"
@@ -347,7 +353,11 @@ load_Whitelist () {
 	add Skynet-Temp $(nvram get wan0_dns | awk '{print $2}') comment \"Whitelist: wan0_dns\"
 	add Skynet-Temp $(nvram get dhcp_dns1_x) comment \"Whitelist: dhcp_dns1_x\"
 	add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"
-	add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback_ipaddr\"
+	add Skynet-Temp 0.0.0.0/8 comment \"Whitelist: current network\"
+	add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback addresses\"
+	add Skynet-Temp 169.254.0.0/16 comment \"Whitelist: link-local addresses\"
+	add Skynet-Temp 224.0.0.0/4  comment \"Whitelist: IP multicast\"
+	add Skynet-Temp 255.255.255.255/32 comment \"Whitelist: limited broadcast\"
 	add Skynet-Temp 8.8.8.8 comment \"Whitelist: Google Public DNS\"
 	add Skynet-Temp 8.8.4.4 comment \"Whitelist: Google Public DNS\"
 	add Skynet-Temp 1.1.1.1 comment \"Whitelist: Cloudflare DNS\"
@@ -363,9 +373,10 @@ load_Whitelist () {
 	wait
 	# Whitelist root hints:
 	local response_code
+	local temp="$dir_temp/file"
 	local file="$dir_cache2/named.root"
-	if response_code=$(curl -fsL --retry 3 --connect-timeout 3 "http://www.internic.net/domain/named.root" --output "$dir_temp/download" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
-		mv -f "$dir_temp/download" "$file"
+	if response_code=$(curl -fsL --retry 3 --connect-timeout 3 "http://www.internic.net/domain/named.root" --output "$temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
+		mv -f "$temp" "$file"
 	fi
 	if [ -f "$file" ]; then
 		< "$file" filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' >> "$dir_temp/ipset"
@@ -384,7 +395,7 @@ load_Blacklist () {
 	log_Skynet "[i] Update blacklist_ip/cidr"
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net hashsize "$(($(echo "$blacklist_ip" | wc -w) + 8))" comment
-	echo "$blacklist_ip" | filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' | ipset restore -!
+	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' | ipset restore -!
 	ipset swap "Skynet-Blacklist" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
 }
@@ -396,7 +407,7 @@ load_Domain () {
 	true > "$dir_temp/ipset"
 	local domain n=0
 	for domain in $(echo "$blacklist_domain" | filter_Domain); do
-		domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
+		domain_Lookup "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
 		n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 	done
 	wait
@@ -416,7 +427,7 @@ load_ASN () {
 	local asn n=0
 	for asn in $(echo "$blacklist_asn" | filter_ASN); do
 		(
-			set -o pipefail; curl -fsL --retry 3 --connect-timeout 3 "https://ipinfo.io/$asn" | filter_IP_CIDR | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
+			set -o pipefail; curl -fsL --retry 3 --connect-timeout 3 "https://ipinfo.io/$asn" | filter_IP_CIDR | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
 			if [ $? -ne 0 ]; then
 				log_Skynet "[*] Download error https://ipinfo.io/$asn"
 				touch "$dir_reload/asn"
@@ -443,14 +454,15 @@ load_Set () {
 	fi
 	ipset -q destroy "Skynet-Temp"
 	ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$file") + 8))" maxelem 262144 comment
-	< "$file" filter_IP_CIDR | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' | ipset restore -!
+	< "$file" filter_IP_CIDR | filter_PrivateIP | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' | ipset restore -!
 	ipset swap "$setname" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
+	date >> "$dir_update/$comment.log"
+	tail -n 100 "$dir_update/$comment.log" > "$dir_temp/log" && mv -f "$dir_temp/log" "$dir_update/$comment.log"
 }
 
 
 download_Set () {
-	local freshcount=0
 	echo "$blacklist_set" | filter_URL_Line > "$dir_temp/blacklist_set"
 	while IFS= read -r line; do
 		local url=$(echo "$line" | filter_URL)
@@ -473,27 +485,28 @@ download_Set () {
 		fi
 
 		local response_code
+		local temp="$dir_temp/file"
 		local file="$dir_cache1/$setname"
-		if response_code=$(curl -fsL --retry 3 --connect-timeout 3 $url --output "$dir_temp/download" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
-			mv -f "$dir_temp/download" "$file"
+		if response_code=$(curl -fsL --retry 3 --connect-timeout 3 "$url" --output "$temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
+			if [ -f "$file" ] && cmp -s "$temp" "$file" && ipset list -n "$setname" >/dev/null 2>&1; then
+				log_Skynet "[!] Fresh $comment (redownload)"
+				continue
+			fi
+			mv -f "$temp" "$file"
 			load_Set
 		elif [ "$response_code" = "304" ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
 			load_Set
 		elif [ "$response_code" = "304" ]; then
-			echo " [i] Fresh $comment"
-			freshcount=$((freshcount + 1))
+			log_Skynet "[i] Fresh $comment"
 		else
 			log_Skynet "[*] Download error $response_code $url"
 			touch "$dir_reload/$setname"
 		fi
 	done < "$dir_temp/blacklist_set"
 
-	if [ "$option" = "cru" ] && [ $freshcount -ge 1 ]; then
-		log_Skynet "[i] Update $freshcount fresh cache sets"
-		return
-	fi
 
 	# Unload unlisted sets
+	[ "$option" = "cru" ] && return
 	local url list="" setname
 	local lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
 	for url in $(echo "$blacklist_set" | filter_URL); do
@@ -507,7 +520,7 @@ download_Set () {
 		fi
 	done
 	cd "$dir_cache1"
-	for setname in $(ls -1t); do
+	for setname in $(ls -1t | filter_Skynet_Set); do
 		if ! echo "$list" | grep -q "$setname"; then
 			rm -f "$dir_cache1/$setname"
 		fi
@@ -551,6 +564,7 @@ case "$command" in
 		rm -f "$dir_system/"*
 		rm -f "$dir_temp/"*
 		touch "$file_installtime"
+		touch "$file_warninglog"
 		touch "$file_errorlog"
 		echo 0 > "$file_updatecount"
 		if [ "$0" != "/jffs/scripts/firewall" ]; then
@@ -594,12 +608,14 @@ case "$command" in
 
 	update)
 		header "Update"
-		if [ "$option" = "cru" ] && [ ! -f "$dir_reload/all" ]; then
+		if [ "$option" = "cru" ]; then
 			updatecount=$(head -1 "$file_updatecount" 2>/dev/null)
 			updatecount=$((updatecount + 1))
 			echo "$updatecount" > "$file_updatecount"
-		else
-			rm -f "$dir_reload/"*
+		fi
+		if [ -f "$dir_reload/all" ]; then
+			rm -f "$dir_reload/all"
+			updatecount=0
 		fi
 		load_Whitelist
 		load_Blacklist
@@ -628,12 +644,23 @@ case "$command" in
 	;;
 
 
+	warning)
+		header
+		if [ -f "$file_warninglog" ] && [ $(wc -l < "$file_warninglog") -ge 1 ]; then
+			cat "$file_warninglog"
+		else
+			echo "Empty warning.log"
+		fi
+		echo
+	;;
+
+
 	error)
 		header
 		if [ -f "$file_errorlog" ] && [ $(wc -l < "$file_errorlog") -ge 1 ]; then
 			cat "$file_errorlog"
 		else
-			echo "Empty error log"
+			echo "Empty error.log"
 		fi
 		echo
 	;;
