@@ -80,6 +80,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
+version="1.01"
 
 dir_skynet="/tmp/skynet"
 dir_cache1="$dir_skynet/cache1"
@@ -144,7 +145,7 @@ lockfile="/tmp/var/lock/skynet.lock"
 exec 99>$lockfile
 flock -n 99
 if [ $? -ne 0 ]; then
-	echo "[i] An instance of Skynet Lite is already running"; echo; exit 1
+	echo "[i] An instance of Skynet Lite $version is already running"; echo; exit 1
 fi
 
 
@@ -314,18 +315,7 @@ filter_Skynet_Set () {
 
 
 is_IP () {
-	grep -oE '^((25[0-4]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[1-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})$'
-}
-
-
-lan_CIDR_Lookup () {
-	if [ "$(echo "$1" | cut -c1-8)" = "192.168." ];	then
-		echo "192.168.0.0/16"
-	elif [ "$(echo "$1" | cut -c1-4)" = "172." ]; then
-		echo "172.16.0.0/12"
-	elif [ "$(echo "$1" | cut -c1-3)" = "10." ]; then
-		echo "10.0.0.0/8";
-	fi
+	grep -oE '^((25[0-4]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})$'
 }
 
 
@@ -346,16 +336,18 @@ load_Whitelist () {
 	log_Skynet "[i] Update whitelist"
 	true > "$dir_temp/ipset"
 	# Whitelist router, reserved IP addresses and static DNS:
-	echo "add Skynet-Temp $(lan_CIDR_Lookup $(nvram get lan_ipaddr)) comment \"Whitelist: lan_ipaddr\"
-	add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Whitelist: wan0_ipaddr\"
+	echo "add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Whitelist: wan0_ipaddr\"
 	add Skynet-Temp $(nvram get wan0_gateway) comment \"Whitelist: wan0_gateway\"
 	add Skynet-Temp $(nvram get wan0_dns | awk '{print $1}') comment \"Whitelist: wan0_dns\"
 	add Skynet-Temp $(nvram get wan0_dns | awk '{print $2}') comment \"Whitelist: wan0_dns\"
 	add Skynet-Temp $(nvram get dhcp_dns1_x) comment \"Whitelist: dhcp_dns1_x\"
 	add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"
 	add Skynet-Temp 0.0.0.0/8 comment \"Whitelist: current network\"
+	add Skynet-Temp 10.0.0.0/8 comment \"Whitelist: private network\"
 	add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback addresses\"
 	add Skynet-Temp 169.254.0.0/16 comment \"Whitelist: link-local addresses\"
+	add Skynet-Temp 172.16.0.0/12 comment \"Whitelist: private network\"
+	add Skynet-Temp 192.168.0.0/16  comment \"Whitelist: private network\"
 	add Skynet-Temp 224.0.0.0/4  comment \"Whitelist: IP multicast\"
 	add Skynet-Temp 255.255.255.255/32 comment \"Whitelist: limited broadcast\"
 	add Skynet-Temp 8.8.8.8 comment \"Whitelist: Google Public DNS\"
@@ -532,8 +524,8 @@ header () {
 	[ "$option" = "cru" ] && return
 	clear
 	sed -n '2,7s/#//p' "$0"
-	echo " Skynet Lite by Willem Bartels"
-	echo " Code based on Skynet By Adamm"
+	echo " Skynet Lite $version by Willem Bartels"
+	echo " Code based is on Skynet By Adamm"
 	echo
 	if [ -n "$1" ] || [ -n "$2" ]; then
 		echo "-----------------------------------------------------------"
