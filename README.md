@@ -21,8 +21,9 @@ curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.
 Commands;
 firewall
 firewall 192.168.1.1
-firewall fresh
 firewall update
+firewall fresh
+firewall warning
 firewall error
 firewall reset
 firewall uninstall
