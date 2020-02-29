@@ -51,7 +51,7 @@ logmode="enabled"
 loginvalid="disabled"
 
 
-blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {1}
+blacklist_set="		<alienvault_reputation>			https://iplists.firehol.org/files/alienvault_reputation.ipset  {1}
 					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
 					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset
@@ -80,7 +80,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.01"
+version="1.02"
 
 dir_skynet="/tmp/skynet"
 dir_cache1="$dir_skynet/cache1"
@@ -104,7 +104,7 @@ fi
 
 i=0
 while [ "$(nvram get ntp_ready)" = "0" ]; do
-	if [ $i -eq 0 ]; then logger -st skynet "[i] Waiting for NTP to sync..."; fi
+	if [ $i -eq 0 ]; then logger -st skynet "[!] Waiting for NTP to sync..."; fi
 	if [ $i -eq 300 ]; then
 		logger -st skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!";
 		echo "unknown time | NTP failed to start after 5 minutes - Please fix immediately!" >> "$file_errorlog"
@@ -120,7 +120,10 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 		if ping -q -w1 -c1 google.com >/dev/null 2>&1; then break; fi
 		if ping -q -w1 -c1 github.com >/dev/null 2>&1; then break; fi
 		if ping -q -w1 -c1 amazon.com >/dev/null 2>&1; then break; fi
-		if [ $i -eq 1 ]; then logger -st skynet "[!] Waiting for internet connectivity..."; fi
+		if [ $i -eq 1 ]; then
+			logger -st skynet "[!] Waiting for internet connectivity...";
+			echo "$(date) | Waiting for internet connectivity..." >> "$file_warninglog"
+		fi
 		if [ $i -eq 6 ]; then
 			logger -st skynet "[*] Internet connectivity error"
 			echo "$(date) | Internet connectivity error" >> "$file_errorlog"
@@ -145,7 +148,7 @@ lockfile="/tmp/var/lock/skynet.lock"
 exec 99>$lockfile
 flock -n 99
 if [ $? -ne 0 ]; then
-	echo "[i] An instance of Skynet Lite $version is already running"; echo; exit 1
+	echo "[i] An instance of Skynet Lite is already running"; echo; exit 1
 fi
 
 
@@ -246,6 +249,11 @@ log_Skynet () {
 }
 
 
+log_Tail () {
+	tail -n 750 "$1" > "$dir_temp/log" && mv -f "$dir_temp/log" "$1"
+}
+
+
 domain_Lookup () {
 	set -o pipefail; nslookup "$1" 2>/dev/null | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk 'NR>2'
 	if [ $? -ne 0 ]; then
@@ -285,7 +293,7 @@ filter_Update_Cycles () {
 
 
 filter_IP_CIDR () {
-	grep -oE '\b(((25[0-4]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})(\/(3[0-2]|[12]?[0-9]))?)\b'
+	grep -oE '\b(((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})(\/(3[0-2]|[12]?[0-9]))?)\b'
 }
 
 
@@ -315,7 +323,7 @@ filter_Skynet_Set () {
 
 
 is_IP () {
-	grep -oE '^((25[0-4]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})$'
+	grep -oE '^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})$'
 }
 
 
@@ -449,8 +457,7 @@ load_Set () {
 	< "$file" filter_IP_CIDR | filter_PrivateIP | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' | ipset restore -!
 	ipset swap "$setname" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
-	date >> "$dir_update/$comment.log"
-	tail -n 100 "$dir_update/$comment.log" > "$dir_temp/log" && mv -f "$dir_temp/log" "$dir_update/$comment.log"
+	date >> "$dir_update/$comment.log"; log_Tail "$dir_update/$comment.log"
 }
 
 
@@ -696,4 +703,6 @@ case "$command" in
 esac
 
 
+log_Tail "$file_warninglog"
+log_Tail "$file_errorlog"
 rm -f "$dir_temp/"*
