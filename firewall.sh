@@ -51,19 +51,18 @@ logmode="enabled"
 loginvalid="disabled"
 
 
-blacklist_set="		<alienvault_reputation>			https://iplists.firehol.org/files/alienvault_reputation.ipset  {1}
+blacklist_set="		<alienvault_reputation>			https://iplists.firehol.org/files/alienvault_reputation.ipset  {4}
 					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
 					<blocklist_net_ua>				https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
-					<ciarmy_cins_score>				https://cinsscore.com/list/ci-badguys.txt  {1}
-					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset
-					<dshield>						https://iplists.firehol.org/files/dshield.netset  {1}
+					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
+					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<maxmind_high_risk>				https://www.maxmind.com/en/high-risk-ip-sample-list  {12}
+					<maxmind_high_risk>				https://www.maxmind.com/en/high-risk-ip-sample-list  {16}
 					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
-					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {12}
-					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
-					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
+					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {16}
+					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {16}
+					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {4}
 					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
 blacklist_ip=""
 blacklist_domain=""
@@ -81,7 +80,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.03"
+version="1.04"
 
 dir_skynet="/tmp/skynet"
 dir_cache1="$dir_skynet/cache1"
@@ -450,14 +449,21 @@ load_ASN () {
 
 
 load_Set () {
-	log_Skynet "[i] Update $comment"
+	true > "$dir_temp/ipset"
 	if ! ipset list -n "$setname" >/dev/null 2>&1; then
 		ipset create "$setname" hash:net hashsize 64 maxelem 262144 comment
 		ipset add Skynet-Master "$setname" comment "$comment"
 	fi
+	< "$file" filter_IP_CIDR | filter_PrivateIP | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' >> "$dir_temp/ipset"
+	if [ $( wc -l < "$dir_temp/ipset" ) -eq 0 ]; then
+		log_Skynet "[*] No public IP address found in $url"
+		touch "$dir_reload/$setname"
+		rm -f "$file"
+		return
+	fi
+	log_Skynet "[i] Update $comment"
 	ipset -q destroy "Skynet-Temp"
-	ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$file") + 8))" maxelem 262144 comment
-	< "$file" filter_IP_CIDR | filter_PrivateIP | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' | ipset restore -!
+	ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" maxelem 262144 comment
 	ipset swap "$setname" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
 	date >> "$dir_update/$comment.log"; log_Tail "$dir_update/$comment.log"
