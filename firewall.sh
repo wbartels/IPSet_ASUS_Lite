@@ -80,7 +80,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.04b"
+version="1.04c"
 
 dir_skynet="/tmp/skynet"
 dir_cache1="$dir_skynet/cache1"
@@ -449,12 +449,7 @@ load_ASN () {
 
 
 load_Set () {
-	true > "$dir_temp/ipset"
-	if ! ipset list -n "$setname" >/dev/null 2>&1; then
-		ipset create "$setname" hash:net hashsize 64 maxelem 262144 comment
-		ipset add Skynet-Master "$setname" comment "$comment"
-	fi
-	< "$file" filter_IP_CIDR | filter_PrivateIP | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' >> "$dir_temp/ipset"
+	< "$file" filter_IP_CIDR | filter_PrivateIP | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' > "$dir_temp/ipset"
 	if [ $( wc -l < "$dir_temp/ipset" ) -eq 0 ]; then
 		log_Skynet "[*] No public IP address found in $url"
 		touch "$dir_reload/$setname"
@@ -462,6 +457,10 @@ load_Set () {
 		return
 	fi
 	log_Skynet "[i] Update $comment"
+	if ! ipset list -n "$setname" >/dev/null 2>&1; then
+		ipset create "$setname" hash:net hashsize 64 maxelem 262144 comment
+		ipset add Skynet-Master "$setname" comment "$comment"
+	fi
 	ipset -q destroy "Skynet-Temp"
 	ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" maxelem 262144 comment
 	ipset restore -! -f "$dir_temp/ipset"
