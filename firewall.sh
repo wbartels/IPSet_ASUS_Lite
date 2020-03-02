@@ -80,7 +80,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.04"
+version="1.04b"
 
 dir_skynet="/tmp/skynet"
 dir_cache1="$dir_skynet/cache1"
@@ -464,6 +464,7 @@ load_Set () {
 	log_Skynet "[i] Update $comment"
 	ipset -q destroy "Skynet-Temp"
 	ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" maxelem 262144 comment
+	ipset restore -! -f "$dir_temp/ipset"
 	ipset swap "$setname" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
 	date >> "$dir_update/$comment.log"; log_Tail "$dir_update/$comment.log"
