@@ -81,7 +81,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.04d"
+version="1.04e"
 
 dir_skynet="/tmp/skynet"
 dir_cache1="$dir_skynet/cache1"
@@ -382,7 +382,7 @@ load_Whitelist () {
 		mv -f "$temp" "$file"
 	fi
 	if [ -f "$file" ]; then
-		< "$file" filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' >> "$dir_temp/ipset"
+		< "$file" filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' >> "$dir_temp/ipset"
 	fi
 	# Restore and swap Skynet-Temp:
 	ipset -q destroy "Skynet-Temp"
@@ -396,9 +396,10 @@ load_Whitelist () {
 load_Blacklist () {
 	[ "$option" = "cru" ] && return
 	log_Skynet "[i] Update blacklist_ip/cidr"
+	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' > "$dir_temp/ipset"
 	ipset -q destroy "Skynet-Temp"
-	ipset create Skynet-Temp hash:net hashsize "$(($(echo "$blacklist_ip" | wc -w) + 8))" comment
-	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' | ipset restore -!
+	ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" comment
+	ipset restore -! -f "$dir_temp/ipset"
 	ipset swap "Skynet-Blacklist" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
 }
@@ -451,7 +452,7 @@ load_ASN () {
 
 load_Set () {
 	< "$file" filter_IP_CIDR | filter_PrivateIP | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' > "$dir_temp/ipset"
-	if [ $( wc -l < "$dir_temp/ipset" ) -eq 0 ]; then
+	if [ $(wc -l < "$dir_temp/ipset") -eq 0 ]; then
 		log_Skynet "[*] No public IP address found in $url"
 		touch "$dir_reload/$setname"
 		rm -f "$file"
