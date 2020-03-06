@@ -59,7 +59,7 @@ blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/rep
 					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<maxmind_high_risk>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
+					<maxmind_high_risk>				https://www.maxmind.com/en/high-risk-ip-sample-list  {96}
 					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
 					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
@@ -81,7 +81,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.04e"
+version="1.04f"
 
 dir_skynet="/tmp/skynet"
 dir_cache1="$dir_skynet/cache1"
@@ -593,7 +593,7 @@ case "$command" in
 		m1=$((rand / 18 + 0));  m2=$((rand / 18 + 15))
 		m3=$((rand / 18 + 30)); m4=$((rand / 18 + 45))
 		cru d Skynet_update
-		cru a Skynet_update "$m1,$m2,$m3,$m4 * * * * nice -n 19 sh /jffs/scripts/firewall update cru"
+		cru a Skynet_update "$m1,$m2,$m3,$m4 * * * * nice -n19 ionice -c2 -n7 sh /jffs/scripts/firewall update cru"
 		unload_IPTables
 		unload_LogIPTables
 		unload_IPSets
