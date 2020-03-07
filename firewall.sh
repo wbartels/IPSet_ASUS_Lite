@@ -81,7 +81,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.04f"
+version="1.04g"
 
 dir_skynet="/tmp/skynet"
 dir_cache1="$dir_skynet/cache1"
@@ -378,7 +378,7 @@ load_Whitelist () {
 	local response_code=
 	local temp="$dir_temp/file"
 	local file="$dir_cache2/named.root"
-	if response_code=$(curl -fsL --retry 3 --connect-timeout 3 "http://www.internic.net/domain/named.root" --output "$temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
+	if response_code=$(curl -fsL --retry 3 --connect-timeout 5 --max-time 30 "http://www.internic.net/domain/named.root" --output "$temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 		mv -f "$temp" "$file"
 	fi
 	if [ -f "$file" ]; then
@@ -431,7 +431,7 @@ load_ASN () {
 	local asn= n=0
 	for asn in $(echo "$blacklist_asn" | filter_ASN); do
 		(
-			set -o pipefail; curl -fsL --retry 3 --connect-timeout 3 "https://ipinfo.io/$asn" | filter_IP_CIDR | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
+			set -o pipefail; curl -fsL --retry 3 --connect-timeout 5 --max-time 30 "https://ipinfo.io/$asn" | filter_IP_CIDR | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
 			if [ $? -ne 0 ]; then
 				log_Skynet "[*] Download error https://ipinfo.io/$asn"
 				touch "$dir_reload/asn"
@@ -497,7 +497,7 @@ download_Set () {
 		local response_code=
 		local temp="$dir_temp/file"
 		local file="$dir_cache1/$setname"
-		if response_code=$(curl -fsL --retry 3 --connect-timeout 3 "$url" --output "$temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
+		if response_code=$(curl -fsL --retry 3 --connect-timeout 5 --max-time 30 "$url" --output "$temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
 			if [ -f "$file" ] && cmp -s "$temp" "$file" && ipset list -n "$setname" >/dev/null 2>&1; then
 				log_Skynet "[!] Fresh $comment (redownload)"
 				continue
