@@ -54,7 +54,7 @@ loginvalid="disabled"
 blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {4}
 					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
-					<blocklist_net_ua>				https://blocklist.net.ua/blocklist.csv  {1}
+					<blocklist_net_ua>				https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
 					<ciarmy>						https://cinsscore.com/list/ci-badguys.txt  {1}
 					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
@@ -81,7 +81,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.05"
+version="1.05b"
 
 dir_skynet="/tmp/skynet"
 dir_cache1="$dir_skynet/cache1"
