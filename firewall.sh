@@ -54,7 +54,7 @@ loginvalid="disabled"
 blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {4}
 					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
-					<badips>						https://www.badips.com/get/list/any/5?age=7d  {1}
+					<blocklist_net_ua>				https://blocklist.net.ua/blocklist.csv  {1}
 					<ciarmy>						https://cinsscore.com/list/ci-badguys.txt  {1}
 					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
@@ -81,7 +81,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.10c"
+version="1.10d"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 
 dir_skynet="/tmp/skynet"
@@ -375,7 +375,7 @@ curl_Error() {
 
 
 load_Whitelist() {
-	local domain= exit_status= file= http_code= n=0 temp= url=
+	local curl_exit= domain= file= http_code= n=0 temp= url=
 	[ $((updatecount % 48)) -ne 0 ] && return
 	log_Skynet "[i] Update whitelist"
 	# Whitelist router, reserved IP addresses and static DNS:
@@ -407,11 +407,11 @@ load_Whitelist() {
 	wait
 	# Whitelist root hints:
 	url="http://www.internic.net/domain/named.root"
-	temp="$dir_temp/file"; touch "$temp"
+	temp="$dir_temp/file"; rm -f "$temp"; touch "$temp"
 	file="$dir_cache2/named.root"
 	http_code=$(curl --silent --fail --location --connect-timeout 10 --max-time 180 --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$file")
-	exit_status=$?
-	if [ "$http_code" = "200" ] && [ $exit_status -eq 0 ]; then
+	curl_exit=$?
+	if [ "$http_code" = "200" ] && [ $curl_exit -eq 0 ]; then
 		mv -f "$temp" "$file"
 	fi
 	if [ -f "$file" ]; then
@@ -468,11 +468,11 @@ load_ASN() {
 			url="https://ipinfo.io/$asn"
 			temp="$dir_temp/$asn"
 			http_code=$(curl --silent --fail --location --connect-timeout 10 --max-time 180 --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url")
-			exit_status=$?
-			if [ "$http_code" = "200" ] && [ $exit_status -eq 0 ]; then
+			curl_exit=$?
+			if [ "$http_code" = "200" ] && [ $curl_exit -eq 0 ]; then
 				< "$temp" filter_IP_CIDR | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
 			else
-				log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $exit_status) $url"
+				log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $curl_exit) $url"
 				touch "$dir_reload/asn"
 			fi
 		) &
@@ -512,7 +512,7 @@ load_Set() {
 
 
 download_Set() {
-	local comment= exit_status= file= http_code= list= lookup= setname= update_cycles= url= temp=
+	local comment= curl_exit= file= http_code= list= lookup= setname= update_cycles= url= temp=
 	echo "$blacklist_set" | filter_URL_Line > "$dir_temp/blacklist_set"
 
 	while IFS= read -r line; do
@@ -535,23 +535,23 @@ download_Set() {
 			continue
 		fi
 
-		temp="$dir_temp/file"; touch "$temp"
+		temp="$dir_temp/file"; rm -f "$temp"; touch "$temp"
 		file="$dir_cache1/$setname"
 		http_code=$(curl --silent --fail --location --connect-timeout 10 --max-time 180 --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$file")
-		exit_status=$?
-		if [ "$http_code" = "200" ] && [ $exit_status -eq 0 ]; then
+		curl_exit=$?
+		if [ "$http_code" = "200" ] && [ $curl_exit -eq 0 ]; then
 			if [ -f "$file" ] && cmp -s "$temp" "$file" && ipset list -n "$setname" >/dev/null 2>&1; then
 				log_Skynet "[!] Fresh $comment (redownload)"
 				continue
 			fi
 			mv -f "$temp" "$file"
 			load_Set
-		elif [ "$http_code" = "304" ] && [ $exit_status -eq 0 ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
+		elif [ "$http_code" = "304" ] && [ $curl_exit -eq 0 ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
 			load_Set
-		elif [ "$http_code" = "304" ] && [ $exit_status -eq 0 ]; then
+		elif [ "$http_code" = "304" ] && [ $curl_exit -eq 0 ]; then
 			log_Skynet "[i] Fresh $comment"
 		else
-			log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $exit_status) $url"
+			log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $curl_exit) $url"
 			touch "$dir_reload/$setname"
 		fi
 	done < "$dir_temp/blacklist_set"
