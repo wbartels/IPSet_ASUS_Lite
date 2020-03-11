@@ -54,15 +54,15 @@ loginvalid="disabled"
 blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {4}
 					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
-					<blocklist_net_ua>				https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
+					<badips>						https://www.badips.com/get/list/any/5?age=7d  {1}
 					<ciarmy>						https://cinsscore.com/list/ci-badguys.txt  {1}
 					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
 					<maxmind_high_risk>				https://www.maxmind.com/en/high-risk-ip-sample-list  {96}
 					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
-					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {12}
-					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
+					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {24}
+					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {24}
 					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {4}
 					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
 blacklist_ip=""
@@ -81,7 +81,8 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.05b"
+version="1.10"
+useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 
 dir_skynet="/tmp/skynet"
 dir_cache1="$dir_skynet/cache1"
@@ -242,10 +243,11 @@ unload_IPSets() {
 
 
 log_Skynet() {
+	local text= type=
 	logger -t skynet "$1"
 	echo " $1" >&2
-	local type="$(echo "$1" | cut -c1-3)"
-	local text="$(echo "$1" | cut -c5-)"
+	type="$(echo "$1" | cut -c1-3)"
+	text="$(echo "$1" | cut -c5-)"
 	[ "$type" = "[!]" ] && echo "$(date) | $text" >> "$file_warninglog"
 	[ "$type" = "[*]" ] && echo "$(date) | $text" >> "$file_errorlog"
 }
@@ -342,7 +344,38 @@ file_Age() {
 }
 
 
+curl_Error() {
+	case "$1" in
+		1)  echo -n "Unsupported protocol" ;;
+		2)  echo -n "Failed initialization" ;;
+		3)  echo -n "URL malformat" ;;
+		4)  echo -n "Not built in" ;;
+		5)  echo -n "Couldnt resolve proxy" ;;
+		6)  echo -n "Couldnt resolve host" ;;
+		7)  echo -n "Couldnt connect" ;;
+		8)  echo -n "Weird server reply" ;;
+		9)  echo -n "Remote access denied" ;;
+		18) echo -n "Partial file" ;;
+		22) echo -n "HTTP error" ;;
+		23) echo -n "Write error" ;;
+		26) echo -n "Read error" ;;
+		27) echo -n "Out of memory" ;;
+		28) echo -n "Connection timed out" ;;
+		33) echo -n "Range error" ;;
+		35) echo -n "SSL connect error" ;;
+		36) echo -n "Bad download resume" ;;
+		47) echo -n "Too many redirects" ;;
+		52) echo -n "Empty reply from server" ;;
+		55) echo -n "Send error" ;;
+		56) echo -n "Receive error" ;;
+		61) echo -n "Bad content encoding" ;;
+		*)  echo -n "Error $1 returned by curl" ;;
+	esac
+}
+
+
 load_Whitelist() {
+	local domain= file= http_code= n=0 temp= url=
 	[ $((updatecount % 48)) -ne 0 ] && return
 	log_Skynet "[i] Update whitelist"
 	# Whitelist router, reserved IP addresses and static DNS:
@@ -367,23 +400,23 @@ load_Whitelist() {
 	# Whitelist ip:
 	echo "$whitelist_ip" | filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$dir_temp/ipset"
 	# Whitelist domain:
-	local domain= n=0
 	for domain in $(echo "internic.net ipinfo.io $whitelist_domain $(echo "$blacklist_set" | strip_Domain) $(nvram get ntp_server0) $(nvram get ntp_server1)" | filter_Domain); do
 		domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
 		n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 	done
 	wait
 	# Whitelist root hints:
-	local response_code=
-	local temp="$dir_temp/file"
-	local file="$dir_cache2/named.root"
-	if response_code=$(curl -fsL --retry 3 --connect-timeout 5 --speed-limit 64000 --speed-time 5 "http://www.internic.net/domain/named.root" --output "$temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
+	url="http://www.internic.net/domain/named.root"
+	temp="$dir_temp/file"; touch "$temp"
+	file="$dir_cache2/named.root"
+	http_code=$(curl --silent --fail --location --connect-timeout 10 --max-time 180 --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$file")
+	if [ "$http_code" = "200" ] && [ $exit_status -eq 0 ]; then
 		mv -f "$temp" "$file"
 	fi
 	if [ -f "$file" ]; then
 		< "$file" filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' >> "$dir_temp/ipset"
 	fi
-	# Restore and swap Skynet-Temp:
+	# Update ipset:
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" comment
 	ipset restore -! -f "$dir_temp/ipset"
@@ -405,10 +438,10 @@ load_Blacklist() {
 
 
 load_Domain() {
+	local domain= n=0
 	[ $((updatecount % 48)) -ne 0 ] && return
 	log_Skynet "[i] Update blacklist_domain"
 	true > "$dir_temp/ipset"
-	local domain= n=0
 	for domain in $(echo "$blacklist_domain" | filter_Domain); do
 		domain_Lookup "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
 		n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
@@ -423,16 +456,22 @@ load_Domain() {
 
 
 load_ASN() {
+	local asn= n=0
 	[ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ] && return
 	log_Skynet "[i] Update blacklist_asn"
 	rm -f "$dir_reload/asn"
 	true > "$dir_temp/ipset"
-	local asn= n=0
 	for asn in $(echo "$blacklist_asn" | filter_ASN); do
 		(
-			set -o pipefail; curl -fsL --retry 3 --connect-timeout 5 --speed-limit 64000 --speed-time 5 "https://ipinfo.io/$asn" | filter_IP_CIDR | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
-			if [ $? -ne 0 ]; then
-				log_Skynet "[*] Download error https://ipinfo.io/$asn"
+			# subshell
+			url="https://ipinfo.io/$asn"
+			temp="$dir_temp/$asn"
+			http_code=$(curl --silent --fail --location --connect-timeout 10 --max-time 180 --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url")
+			exit_status=$?
+			if [ "$http_code" = "200" ] && [ $exit_status -eq 0 ]; then
+				< "$temp" filter_IP_CIDR | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
+			else
+				log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $exit_status) $url"
 				touch "$dir_reload/asn"
 			fi
 		) &
@@ -472,12 +511,14 @@ load_Set() {
 
 
 download_Set() {
+	local comment= exit_status= file= http_code= list= lookup= setname= update_cycles= url= temp=
 	echo "$blacklist_set" | filter_URL_Line > "$dir_temp/blacklist_set"
+
 	while IFS= read -r line; do
-		local url=$(echo "$line" | filter_URL)
-		local comment=$(echo "$line" | filter_Comment)
-		local update_cycles=$(echo "$line" | filter_Update_Cycles)
-		local setname="Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
+		url=$(echo "$line" | filter_URL)
+		comment=$(echo "$line" | filter_Comment)
+		update_cycles=$(echo "$line" | filter_Update_Cycles)
+		setname="Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
 
 		if [ -z "$comment" ]; then
 			comment=$(basename "$url")
@@ -493,31 +534,30 @@ download_Set() {
 			continue
 		fi
 
-		local response_code=
-		local temp="$dir_temp/file"
-		local file="$dir_cache1/$setname"
-		if response_code=$(curl -fsL --retry 3 --connect-timeout 5 --speed-limit 64000 --speed-time 5 "$url" --output "$temp" --time-cond "$file" --write-out "%{response_code}") && [ "$response_code" = "200" ]; then
+		temp="$dir_temp/file"; touch "$temp"
+		file="$dir_cache1/$setname"
+		http_code=$(curl --silent --fail --location --connect-timeout 10 --max-time 180 --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$file")
+		exit_status=$?
+		if [ "$http_code" = "200" ] && [ $exit_status -eq 0 ]; then
 			if [ -f "$file" ] && cmp -s "$temp" "$file" && ipset list -n "$setname" >/dev/null 2>&1; then
 				log_Skynet "[!] Fresh $comment (redownload)"
 				continue
 			fi
 			mv -f "$temp" "$file"
 			load_Set
-		elif [ "$response_code" = "304" ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
+		elif [ "$http_code" = "304" ] && [ $exit_status -eq 0 ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
 			load_Set
-		elif [ "$response_code" = "304" ]; then
+		elif [ "$http_code" = "304" ] && [ $exit_status -eq 0 ]; then
 			log_Skynet "[i] Fresh $comment"
 		else
-			log_Skynet "[*] Download error $response_code $url"
+			log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $exit_status) $url"
 			touch "$dir_reload/$setname"
 		fi
 	done < "$dir_temp/blacklist_set"
 
-
 	# Unload unlisted sets
 	[ "$option" = "cru" ] && return
-	local url= list= setname=
-	local lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
+	lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
 	for url in $(echo "$blacklist_set" | filter_URL); do
 		list="$list Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
 	done
@@ -528,10 +568,17 @@ download_Set() {
 			ipset -q destroy "$setname"
 		fi
 	done
+	# Cleanup cache and reload directory
 	cd "$dir_cache1"
 	for setname in $(ls -1t | filter_Skynet_Set); do
 		if ! echo "$list" | grep -q "$setname"; then
 			rm -f "$dir_cache1/$setname"
+		fi
+	done
+	cd "$dir_reload"
+	for setname in $(ls -1t | filter_Skynet_Set); do
+		if ! echo "$list" | grep -q "$setname"; then
+			rm -f "$dir_reload/$setname"
 		fi
 	done
 }
@@ -676,7 +723,7 @@ case "$command" in
 
 
 	fresh)
-		header "Blacklist" "Last download"
+		header "Blacklist" "(server) Update time"
 		lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
 		cd "$dir_cache1"
 		for setname in $(ls -1t | filter_Skynet_Set); do
