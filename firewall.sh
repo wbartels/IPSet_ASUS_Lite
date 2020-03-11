@@ -9,7 +9,7 @@
 #   IP Blocking For ASUS Routers Using IPSet
 #   https://github.com/wbartels/IPSet_ASUS_Lite
 #
-#   Code based on Skynet By Adamm
+#   Code is based on Skynet By Adamm
 #   Advanced IP Blocking For ASUS Routers Using IPSet
 #   https://github.com/Adamm00/IPSet_ASUS
 #   This script will always be open source and free to use
@@ -81,7 +81,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.10b"
+version="1.10c"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 
 dir_skynet="/tmp/skynet"
@@ -590,7 +590,7 @@ header() {
 	clear
 	sed -n '2,7s/#//p' "$0"
 	echo " Skynet Lite $version by Willem Bartels"
-	echo " Code based is on Skynet By Adamm"
+	echo " Code is based on Skynet By Adamm"
 	echo
 	if [ -n "$1" ] || [ -n "$2" ]; then
 		echo "-----------------------------------------------------------"
