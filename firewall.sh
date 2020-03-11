@@ -81,7 +81,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.10"
+version="1.10b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 
 dir_skynet="/tmp/skynet"
@@ -375,7 +375,7 @@ curl_Error() {
 
 
 load_Whitelist() {
-	local domain= file= http_code= n=0 temp= url=
+	local domain= exit_status= file= http_code= n=0 temp= url=
 	[ $((updatecount % 48)) -ne 0 ] && return
 	log_Skynet "[i] Update whitelist"
 	# Whitelist router, reserved IP addresses and static DNS:
@@ -410,6 +410,7 @@ load_Whitelist() {
 	temp="$dir_temp/file"; touch "$temp"
 	file="$dir_cache2/named.root"
 	http_code=$(curl --silent --fail --location --connect-timeout 10 --max-time 180 --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$file")
+	exit_status=$?
 	if [ "$http_code" = "200" ] && [ $exit_status -eq 0 ]; then
 		mv -f "$temp" "$file"
 	fi
