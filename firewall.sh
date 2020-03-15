@@ -59,7 +59,7 @@ blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/rep
 					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<maxmind_high_risk>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
+					<maxmind_high_risk>				https://www.maxmind.com/en/high-risk-ip-sample-list  {12}
 					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
 					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
@@ -81,8 +81,10 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.11"
+version="1.12"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
+throttle="0" # initial value, updated for cru update
+
 
 dir_skynet="/tmp/skynet"
 dir_cache1="$dir_skynet/cache1"
@@ -107,7 +109,7 @@ fi
 
 i=0
 while [ "$(nvram get ntp_ready)" = "0" ]; do
-	if [ $i -eq 0 ]; then logger -st skynet "[!] Waiting for NTP to sync..."; fi
+	if [ $i -eq 0 ]; then logger -st skynet "[i] Waiting for NTP to sync..."; fi
 	if [ $i -eq 300 ]; then
 		logger -st skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!";
 		echo "unknown time | NTP failed to start after 5 minutes - Please fix immediately!" >> "$file_errorlog"
@@ -139,8 +141,9 @@ fi
 
 
 if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
+	throttle="1M"
 	if ! sleep=$(head -1 "$file_sleep" 2>/dev/null); then
-		sleep=$(($(printf '%d' 0x$(openssl rand 1 -hex)) / 5 + 4)) # 0..255 / 5 + 4
+		sleep=$(($(printf '%d' 0x$(openssl rand 1 -hex)) / 25 + 5)) # 0..255 / 25 + 5
 		echo "$sleep" > "$file_sleep"
 	fi
 	sleep $sleep
@@ -407,7 +410,7 @@ load_Whitelist() {
 	url="http://www.internic.net/domain/named.root"
 	temp="$dir_temp/named.root"; touch "$temp"
 	cache="$dir_cache2/named.root"
-	if http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache") && [ "$http_code" = "200" ]; then
+	if http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache") && [ "$http_code" = "200" ]; then
 		mv -f "$temp" "$cache"
 	fi
 	if [ -f "$cache" ]; then
@@ -464,7 +467,7 @@ load_ASN() {
 			# subshell
 			url="https://ipinfo.io/$asn"
 			temp="$dir_temp/$asn"
-			http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url"); curl_exit=$?
+			http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url"); curl_exit=$?
 			if [ "$http_code" = "200" ] && [ $curl_exit -eq 0 ]; then
 				< "$temp" filter_IP_CIDR | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
 			else
@@ -533,10 +536,10 @@ download_Set() {
 
 		temp="$dir_temp/$setname"; touch "$temp"
 		cache="$dir_cache1/$setname"
-		http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
+		http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
 		if [ "$http_code" = "200" ] && [ $curl_exit -eq 0 ]; then
 			if [ -f "$cache" ] && cmp -s "$temp" "$cache" && ipset list -n "$setname" >/dev/null 2>&1; then
-				log_Skynet "[!] Fresh $comment (redownload)"
+				log_Skynet "[!] Redownload $comment"
 				continue
 			fi
 			mv -f "$temp" "$cache"
@@ -609,7 +612,7 @@ ip=$(echo "$command" | is_IP) || ip="noip"
 case "$command" in
 	reset)
 		header "Reset"
-		log_Skynet "[!] Install"
+		log_Skynet "[i] Install"
 		rm -f "$dir_reload/"*
 		rm -f "$dir_system/"*
 		rm -f "$dir_temp/"*
