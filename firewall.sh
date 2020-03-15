@@ -46,9 +46,9 @@
 ###################
 
 
-filtertraffic="all"
-logmode="enabled"
-loginvalid="disabled"
+filtertraffic="all"		# inbound, outbound or all
+logmode="enabled"		# enabled or disabled
+loginvalid="disabled"	# enabled or disabled
 
 
 blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {4}
@@ -81,9 +81,9 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.12"
+version="1.12b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
-throttle="0" # initial value, updated for cru update
+throttle="0" # updated by cru update
 
 
 dir_skynet="/tmp/skynet"
@@ -143,7 +143,7 @@ fi
 if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
 	throttle="1M"
 	if ! sleep=$(head -1 "$file_sleep" 2>/dev/null); then
-		sleep=$(($(printf '%d' 0x$(openssl rand 1 -hex)) / 25 + 5)) # 0..255 / 25 + 5
+		sleep=$(($(printf '%d' 0x$(openssl rand 1 -hex)) / 17)) # 0..255 / 17
 		echo "$sleep" > "$file_sleep"
 	fi
 	sleep $sleep
