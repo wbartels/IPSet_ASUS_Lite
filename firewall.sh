@@ -81,7 +81,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.12d"
+version="1.12e"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 throttle="0" # updated by cru update
 
@@ -271,11 +271,6 @@ domain_Lookup() {
 }
 
 
-filter_Domain() {
-	grep -oE '([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]'
-}
-
-
 strip_Domain() {
 	grep -oE 'https?://\S+' | cut -d'/' -f3 | awk '!x[$0]++'
 }
@@ -288,16 +283,6 @@ filter_URL() {
 
 filter_URL_Line() {
 	grep -E 'https?://\S+'
-}
-
-
-filter_Comment() {
-	grep -oE '<.+>' | tr -d '<>' | tr ' ' '_'
-}
-
-
-filter_Update_Cycles() {
-	grep -oE '\{[0-9]+\}' | tr -d '{}'
 }
 
 
@@ -316,8 +301,28 @@ filter_IP_Line() {
 }
 
 
+is_IP() {
+	grep -oE '^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})$'
+}
+
+
 filter_ASN() {
 	grep -oE 'AS[1-9][0-9]{2,9}'
+}
+
+
+filer_Word() {
+	grep -oE '\b\S+\b'
+}
+
+
+filter_Comment() {
+	grep -oE '<.+>' | tr -d '<>' | tr ' ' '_'
+}
+
+
+filter_Update_Cycles() {
+	grep -oE '\{[0-9]+\}' | tr -d '{}'
 }
 
 
@@ -328,23 +333,6 @@ filter_Skynet() {
 
 filter_Skynet_Set() {
 	grep -E '^Skynet-[0-9a-f]{24}'
-}
-
-
-is_IP() {
-	grep -oE '^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})$'
-}
-
-
-file_Age() {
-	local sec=$(($(date +%s) - $(date +%s -r "$1" 2>/dev/null || date +%s)))
-	if [ $sec -lt 86400 ]; then
-		printf '%02d:%02d' $(($sec/3600)) $(($sec%3600/60))
-	elif [ $sec -lt 172800 ]; then
-		printf '1 day %02d:%02d' $(($sec%86400/3600)) $(($sec%3600/60))
-	else
-		printf '%d days %02d:%02d' $(($sec/86400)) $(($sec%86400/3600)) $(($sec%3600/60))
-	fi
 }
 
 
@@ -378,6 +366,18 @@ curl_Error() {
 }
 
 
+file_Age() {
+	local sec=$(($(date +%s) - $(date +%s -r "$1" 2>/dev/null || date +%s)))
+	if [ $sec -lt 86400 ]; then
+		printf '%02d:%02d' $(($sec/3600)) $(($sec%3600/60))
+	elif [ $sec -lt 172800 ]; then
+		printf '1 day %02d:%02d' $(($sec%86400/3600)) $(($sec%3600/60))
+	else
+		printf '%d days %02d:%02d' $(($sec/86400)) $(($sec%86400/3600)) $(($sec%3600/60))
+	fi
+}
+
+
 load_Whitelist() {
 	[ $((updatecount % 48)) -ne 0 ] && return
 	local cache= curl_exit= domain= http_code= n=0 temp= url=
@@ -404,7 +404,7 @@ load_Whitelist() {
 	# Whitelist ip:
 	echo "$whitelist_ip" | filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$dir_temp/ipset"
 	# Whitelist domain:
-	for domain in $(echo "internic.net ipinfo.io $whitelist_domain $(echo "$blacklist_set" | strip_Domain) $(nvram get ntp_server0) $(nvram get ntp_server1)" | filter_Domain); do
+	for domain in $(echo "internic.net ipinfo.io $whitelist_domain $(echo "$blacklist_set" | strip_Domain) $(nvram get ntp_server0) $(nvram get ntp_server1)" | filer_Word); do
 		domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
 		n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 	done
@@ -446,7 +446,7 @@ load_Domain() {
 	local domain= n=0
 	log_Skynet "[i] Update blacklist_domain"
 	true > "$dir_temp/ipset"
-	for domain in $(echo "$blacklist_domain" | filter_Domain); do
+	for domain in $(echo "$blacklist_domain" | filer_Word); do
 		domain_Lookup "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
 		n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 	done
