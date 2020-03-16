@@ -46,9 +46,9 @@
 ###################
 
 
-filtertraffic="all"		# inbound, outbound or all
-logmode="enabled"		# enabled or disabled
-loginvalid="disabled"	# enabled or disabled
+filtertraffic="all"		# inbound | outbound | all
+logmode="enabled"		# enabled | disabled
+loginvalid="disabled"	# enabled | disabled
 
 
 blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {4}
@@ -81,7 +81,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.12b"
+version="1.12d"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 throttle="0" # updated by cru update
 
@@ -104,6 +104,7 @@ mkdir -p "$dir_system" "$dir_temp" "$dir_update"
 
 if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
 	command="reset"
+	option=""
 fi
 
 
@@ -187,6 +188,7 @@ unload_IPTables() {
 
 
 load_IPTables() {
+	local pos1=
 	if [ "$filtertraffic" = "all" ] || [ "$filtertraffic" = "inbound" ]; then
 		iptables -t raw -I PREROUTING -i "$iface" -m set ! --match-set Skynet-Whitelist src -m set --match-set Skynet-Master src -j DROP 2>/dev/null
 	fi
@@ -195,7 +197,7 @@ load_IPTables() {
 		iptables -t raw -I OUTPUT -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j DROP 2>/dev/null
 	fi
 	if [ "$(nvram get sshd_enable)" = "1" ] && [ "$(nvram get sshd_bfp)" = "1" ] && [ "$(uname -o)" = "ASUSWRT-Merlin" ] && [ "$(nvram get switch_wantag)" != "movistar" ]; then
-		local pos1="$(iptables --line -nL SSHBFP | grep -F "seconds: 60 hit_count: 4" | grep -E 'DROP|logdrop' | awk '{print $1}')"
+		pos1="$(iptables --line -nL SSHBFP | grep -F "seconds: 60 hit_count: 4" | grep -E 'DROP|logdrop' | awk '{print $1}')"
 		iptables -I SSHBFP "$pos1" -m recent --update --seconds 60 --hitcount 4 --name SSH --rsource -j SET --add-set Skynet-Blacklist src 2>/dev/null
 		iptables -I SSHBFP "$pos1" -m recent --update --seconds 60 --hitcount 4 --name SSH --rsource -j LOG --log-prefix "[BLOCKED - NEW BAN] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 	fi
@@ -207,28 +209,29 @@ unload_LogIPTables() {
 	iptables -t raw -D PREROUTING -i br0 -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 	iptables -t raw -D OUTPUT -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 	iptables -D logdrop -m state --state NEW -j LOG --log-prefix "[BLOCKED - INVALID] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
-	iptables -D FORWARD -m set --match-set Skynet-IOT src ! -o tun2+ -j LOG --log-prefix "[BLOCKED - IOT] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+	iptables -D FORWARD -i br0 -m set --match-set Skynet-IOT src ! -o tun2+ -j LOG --log-prefix "[BLOCKED - IOT] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 }
 
 
 load_LogIPTables() {
+	local pos2= pos3= pos4= pos5=
 	if [ "$logmode" = "enabled" ]; then
 		if [ "$filtertraffic" = "all" ] || [ "$filtertraffic" = "inbound" ]; then
-			local pos2="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Master src" | grep -F "DROP" | awk '{print $1}')"
+			pos2="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Master src" | grep -F "DROP" | awk '{print $1}')"
 			iptables -t raw -I PREROUTING "$pos2" -i "$iface" -m set ! --match-set Skynet-Whitelist src -m set --match-set Skynet-Master src -j LOG --log-prefix "[BLOCKED - INBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 		fi
 		if [ "$filtertraffic" = "all" ] || [ "$filtertraffic" = "outbound" ]; then
-			local pos3="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Master dst" | grep -F "DROP" | awk '{print $1}')"
+			pos3="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Master dst" | grep -F "DROP" | awk '{print $1}')"
 			iptables -t raw -I PREROUTING "$pos3" -i br0 -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
-			local pos4="$(iptables --line -nL OUTPUT -t raw | grep -F "Skynet-Master dst" | grep -F "DROP" | awk '{print $1}')"
+			pos4="$(iptables --line -nL OUTPUT -t raw | grep -F "Skynet-Master dst" | grep -F "DROP" | awk '{print $1}')"
 			iptables -t raw -I OUTPUT "$pos4" -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 		fi
 		if [ "$(nvram get fw_log_x)" = "drop" ] || [ "$(nvram get fw_log_x)" = "both" ] && [ "$loginvalid" = "enabled" ]; then
 			iptables -I logdrop -m state --state NEW -j LOG --log-prefix "[BLOCKED - INVALID] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 		fi
 		if [ "$iotblocked" = "enabled" ]; then
-			local pos5="$(iptables --line -nL FORWARD | grep -F "Skynet-IOT" | grep -F "DROP" | awk '{print $1}')"
-			iptables -I FORWARD "$pos5" -m set --match-set Skynet-IOT src ! -o tun2+ -j LOG --log-prefix "[BLOCKED - IOT] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+			pos5="$(iptables --line -nL FORWARD | grep -F "Skynet-IOT" | grep -F "DROP" | awk '{print $1}')"
+			iptables -I FORWARD "$pos5" -i br0 -m set --match-set Skynet-IOT src ! -o tun2+ -j LOG --log-prefix "[BLOCKED - IOT] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 		fi
 	fi
 }
@@ -376,8 +379,8 @@ curl_Error() {
 
 
 load_Whitelist() {
-	local cache= curl_exit= domain= http_code= n=0 temp= url=
 	[ $((updatecount % 48)) -ne 0 ] && return
+	local cache= curl_exit= domain= http_code= n=0 temp= url=
 	log_Skynet "[i] Update whitelist"
 	# Whitelist router, reserved IP addresses and static DNS:
 	echo "add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Whitelist: wan0_ipaddr\"
@@ -439,8 +442,8 @@ load_Blacklist() {
 
 
 load_Domain() {
-	local domain= n=0
 	[ $((updatecount % 48)) -ne 0 ] && return
+	local domain= n=0
 	log_Skynet "[i] Update blacklist_domain"
 	true > "$dir_temp/ipset"
 	for domain in $(echo "$blacklist_domain" | filter_Domain); do
@@ -457,14 +460,13 @@ load_Domain() {
 
 
 load_ASN() {
-	local asn= n=0
 	[ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ] && return
+	local asn= n=0
 	log_Skynet "[i] Update blacklist_asn"
 	rm -f "$dir_reload/asn"
 	true > "$dir_temp/ipset"
 	for asn in $(echo "$blacklist_asn" | filter_ASN); do
-		(
-			# subshell
+		(	# subshell
 			url="https://ipinfo.io/$asn"
 			temp="$dir_temp/$asn"
 			http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url"); curl_exit=$?
@@ -474,6 +476,7 @@ load_ASN() {
 				log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $curl_exit) $url"
 				touch "$dir_reload/asn"
 			fi
+			rm -f "$temp"
 		) &
 		n=$((n + 1)); [ $((n % 10)) -eq 0 ] && wait
 		[ -f "$dir_reload/asn" ] && return
