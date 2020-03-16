@@ -4,8 +4,8 @@ Lightweight firewall addition for ARM/HND based ASUS Routers using IPSet.
 Skynet Lite relies on the IPTables from Skynet by Adamm00.
 
 ## Some key features
+- Small one file shell script (also uses tmp directory).
 - No need for an external USB drive.
-- Small one file shell script (also uses tmp directory)
 - Only updates new or changed ipsets.
 - To prevent downtime use the ipset swap feature.
 
