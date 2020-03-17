@@ -81,7 +81,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.12f"
+version="1.12g"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 throttle="0" # updated by cru update
 
@@ -492,13 +492,8 @@ load_ASN() {
 
 
 load_Set() {
-	< "$cache" filter_IP_CIDR | filter_PrivateIP | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' > "$dir_temp/ipset"
-	if [ $(wc -l < "$dir_temp/ipset") -eq 0 ]; then
-		log_Skynet "[!] Empty $comment"
-		rm -f "$cache"
-		return
-	fi
 	log_Skynet "[i] Update $comment"
+	< "$cache" filter_IP_CIDR | filter_PrivateIP | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' > "$dir_temp/ipset"
 	if ! ipset list -n "$setname" >/dev/null 2>&1; then
 		ipset create "$setname" hash:net hashsize 64 maxelem 262144 comment
 		ipset add Skynet-Master "$setname" comment "$comment"
