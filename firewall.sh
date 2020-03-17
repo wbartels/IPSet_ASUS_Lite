@@ -81,7 +81,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.12g"
+version="1.12h"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 throttle="0" # updated by cru update
 
@@ -534,11 +534,10 @@ download_Set() {
 		temp="$dir_temp/$setname"; touch "$temp"
 		cache="$dir_cache1/$setname"
 		http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
-		if [ "$http_code" = "200" ] && [ $curl_exit -eq 0 ]; then
-			if [ -f "$cache" ] && cmp -s "$temp" "$cache" && ipset list -n "$setname" >/dev/null 2>&1; then
-				log_Skynet "[!] Redownload $comment"
-				continue
-			fi
+		if [ "$http_code" = "200" ] && [ $curl_exit -eq 0 ] && [ -f "$cache" ] && cmp -s "$temp" "$cache" && ipset list -n "$setname" >/dev/null 2>&1; then
+			log_Skynet "[!] Redownload $comment"
+			mv -f "$temp" "$cache"
+		elif [ "$http_code" = "200" ] && [ $curl_exit -eq 0 ]; then
 			mv -f "$temp" "$cache"
 			load_Set
 		elif [ "$http_code" = "304" ] && [ $curl_exit -eq 0 ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
