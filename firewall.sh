@@ -21,10 +21,11 @@
 # Commands:
 # firewall
 # firewall 192.168.1.1
-# firewall update
 # firewall fresh
+# firewall entries
 # firewall warning
 # firewall error
+# firewall update
 # firewall reset
 # firewall uninstall
 #
@@ -81,7 +82,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.12h"
+version="1.13"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 throttle="0" # updated by cru update
 
@@ -470,7 +471,7 @@ load_ASN() {
 			url="https://ipinfo.io/$asn"
 			temp="$dir_temp/$asn"
 			http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url"); curl_exit=$?
-			if [ "$http_code" = "200" ] && [ $curl_exit -eq 0 ]; then
+			if [ $curl_exit -eq 0 ]; then
 				< "$temp" filter_IP_CIDR | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
 			else
 				log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $curl_exit) $url"
@@ -534,16 +535,17 @@ download_Set() {
 		temp="$dir_temp/$setname"; touch "$temp"
 		cache="$dir_cache1/$setname"
 		http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
-		if [ "$http_code" = "200" ] && [ $curl_exit -eq 0 ] && [ -f "$cache" ] && cmp -s "$temp" "$cache" && ipset list -n "$setname" >/dev/null 2>&1; then
-			log_Skynet "[!] Redownload $comment"
-			mv -f "$temp" "$cache"
-		elif [ "$http_code" = "200" ] && [ $curl_exit -eq 0 ]; then
-			mv -f "$temp" "$cache"
-			load_Set
-		elif [ "$http_code" = "304" ] && [ $curl_exit -eq 0 ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
-			load_Set
-		elif [ "$http_code" = "304" ] && [ $curl_exit -eq 0 ]; then
-			log_Skynet "[i] Fresh $comment"
+		if [ $curl_exit -eq 0 ]; then
+			if [ "$http_code" = "304" ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
+				load_Set
+			elif [ "$http_code" = "304" ]; then
+				log_Skynet "[i] Fresh $comment"
+			elif [ -f "$cache" ] && cmp -s "$temp" "$cache" && ipset list -n "$setname" >/dev/null 2>&1; then
+				log_Skynet "[!] Redownload $comment"
+			else
+				mv -f "$temp" "$cache"
+				load_Set
+			fi
 		else
 			log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $curl_exit) $url"
 			touch "$dir_reload/$setname"
@@ -721,6 +723,16 @@ case "$command" in
 		cd "$dir_cache1"
 		for setname in $(ls -1t | filter_Skynet_Set); do
 			printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(file_Age "$dir_cache1/$setname")"
+		done
+		footer
+	;;
+
+
+	entries)
+		header "Blacklist" "Number of entries"
+		lookup=$(ipset list Skynet-Master | filter_Skynet | tr -d '"' | awk '{print $1, $7}')
+		for setname in $(echo "$lookup" | sort -k2 | awk '{print $1}'); do
+			printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(ipset list -terse "$setname" | grep -F 'Number of entries:' | grep -Eo '[0-9]+')"
 		done
 		footer
 	;;
