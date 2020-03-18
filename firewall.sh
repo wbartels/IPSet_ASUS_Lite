@@ -82,7 +82,7 @@ command="$1"
 option="$2"
 updatecount=0
 iotblocked="disabled"
-version="1.13"
+version="1.13b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 throttle="0" # updated by cru update
 
@@ -312,7 +312,7 @@ filter_ASN() {
 }
 
 
-filer_Word() {
+filter_Word() {
 	grep -oE '\b\S+\b'
 }
 
@@ -405,7 +405,7 @@ load_Whitelist() {
 	# Whitelist ip:
 	echo "$whitelist_ip" | filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$dir_temp/ipset"
 	# Whitelist domain:
-	for domain in $(echo "internic.net ipinfo.io $whitelist_domain $(echo "$blacklist_set" | strip_Domain) $(nvram get ntp_server0) $(nvram get ntp_server1)" | filer_Word); do
+	for domain in $(echo "internic.net ipinfo.io $whitelist_domain $(echo "$blacklist_set" | strip_Domain) $(nvram get ntp_server0) $(nvram get ntp_server1)" | filter_Word); do
 		domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
 		n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 	done
@@ -447,7 +447,7 @@ load_Domain() {
 	local domain= n=0
 	log_Skynet "[i] Update blacklist_domain"
 	true > "$dir_temp/ipset"
-	for domain in $(echo "$blacklist_domain" | filer_Word); do
+	for domain in $(echo "$blacklist_domain" | filter_Word); do
 		domain_Lookup "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
 		n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
 	done
