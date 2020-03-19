@@ -83,7 +83,7 @@ option="$2"
 updatecount="0"
 throttle="0"
 iotblocked="disabled"
-version="1.14"
+version="1.14b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 
 
@@ -96,7 +96,6 @@ dir_temp="$dir_skynet/temp"
 dir_update="$dir_skynet/update"
 file_errorlog="$dir_skynet/error.log"
 file_installtime="$dir_system/installtime"
-file_sleep="$dir_system/sleep"
 file_updatecount="$dir_system/updatecount"
 file_warninglog="$dir_skynet/warning.log"
 mkdir -p "$dir_cache1" "$dir_cache2" "$dir_reload"
@@ -453,8 +452,7 @@ load_ASN() {
 			fi
 			rm -f "$temp"
 		) &
-		n=$((n + 1));
-		if [ $((n % 10)) -eq 0 ]; then wait; fi
+		n=$((n + 1)); if [ $((n % 10)) -eq 0 ]; then wait; fi
 		if [ -f "$dir_reload/asn" ]; then return; fi
 	done
 	wait
@@ -589,11 +587,7 @@ fi
 
 if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
 	throttle="1M"
-	if ! sleep=$(head -1 "$file_sleep" 2>/dev/null); then
-		sleep=$(rand 1 15)
-		echo "$sleep" > "$file_sleep"
-	fi
-	sleep $sleep
+	sleep $(rand 0 15)
 fi
 
 
