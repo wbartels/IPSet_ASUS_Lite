@@ -80,11 +80,11 @@ whitelist_domain=""
 
 command="$1"
 option="$2"
-updatecount=0
+updatecount="0"
+throttle="0"
 iotblocked="disabled"
-version="1.13b"
+version="1.14"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
-throttle="0" # updated by cru update
 
 
 dir_skynet="/tmp/skynet"
@@ -109,65 +109,11 @@ if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
 fi
 
 
-i=0
-while [ "$(nvram get ntp_ready)" = "0" ]; do
-	if [ $i -eq 0 ]; then logger -st skynet "[i] Waiting for NTP to sync..."; fi
-	if [ $i -eq 300 ]; then
-		logger -st skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!";
-		echo "unknown time | NTP failed to start after 5 minutes - Please fix immediately!" >> "$file_errorlog"
-		touch "$dir_reload/all"
-		echo; exit 1;
-	fi
-	i=$((i + 1)); sleep 1
-done
-
-
-if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
-	for i in 1 2 3 4 5 6; do
-		if ping -q -w1 -c1 google.com >/dev/null 2>&1; then break; fi
-		if ping -q -w1 -c1 github.com >/dev/null 2>&1; then break; fi
-		if ping -q -w1 -c1 amazon.com >/dev/null 2>&1; then break; fi
-		if [ $i -eq 1 ]; then
-			logger -st skynet "[!] Waiting for internet connectivity...";
-			echo "$(date) | Waiting for internet connectivity..." >> "$file_warninglog"
-		fi
-		if [ $i -eq 6 ]; then
-			logger -st skynet "[*] Internet connectivity error"
-			echo "$(date) | Internet connectivity error" >> "$file_errorlog"
-			touch "$dir_reload/all"
-			echo; exit 1
-		fi
-		sleep 9
-	done
-fi
-
-
-if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
-	throttle="1M"
-	if ! sleep=$(head -1 "$file_sleep" 2>/dev/null); then
-		sleep=$(($(printf '%d' 0x$(openssl rand 1 -hex)) / 17)) # 0..255 / 17
-		echo "$sleep" > "$file_sleep"
-	fi
-	sleep $sleep
-fi
-
-
-lockfile="/tmp/var/lock/skynet.lock"
-exec 99>$lockfile
-flock -n 99
-if [ $? -ne 0 ]; then
-	echo "[i] An instance of Skynet Lite is already running"; echo; exit 1
-fi
-
-
 if [ "$(nvram get wan0_proto)" = "pppoe" ]; then
 	iface="ppp0"
 else
 	iface="$(nvram get wan0_ifname)"
 fi
-
-
-unset i sleep
 
 
 ###############
@@ -253,8 +199,8 @@ log_Skynet() {
 	logger -t skynet "$1"
 	echo " $1" >&2
 	local type="$(echo "$1" | cut -c1-3)"
-	[ "$type" = "[!]" ] && echo "$(date) | $(echo "$1" | cut -c5-)" >> "$file_warninglog"
-	[ "$type" = "[*]" ] && echo "$(date) | $(echo "$1" | cut -c5-)" >> "$file_errorlog"
+	if [ "$type" = "[!]" ]; then echo "$(date) | $(echo "$1" | cut -c5-)" >> "$file_warninglog"; fi
+	if [ "$type" = "[*]" ]; then echo "$(date) | $(echo "$1" | cut -c5-)" >> "$file_errorlog"; fi
 }
 
 
@@ -379,8 +325,36 @@ file_Age() {
 }
 
 
+rand() {
+	local min="$1" max="$2"
+	echo $((min + $(printf '%d' 0x$(openssl rand 2 -hex)) * (max - min + 1) / 65025))
+}
+
+
+header() {
+	if [ "$option" = "cru" ]; then return; fi
+	clear
+	sed -n '2,7s/#//p' "$0"
+	echo " Skynet Lite $version by Willem Bartels"
+	echo " Code is based on Skynet By Adamm"
+	echo
+	if [ -n "$1" ] || [ -n "$2" ]; then
+		echo "-----------------------------------------------------------"
+		printf " %-25s  %30s\n" "$1" "$2"
+		echo "-----------------------------------------------------------"
+	fi
+}
+
+
+footer() {
+	if [ "$option" = "cru" ]; then return; fi
+	echo "-----------------------------------------------------------"
+	printf " %-25s  %30s\n\n" "Uptime $(file_Age "$file_installtime")" "$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
+}
+
+
 load_Whitelist() {
-	[ $((updatecount % 48)) -ne 0 ] && return
+	if [ $((updatecount % 48)) -ne 0 ]; then return; fi
 	local cache= curl_exit= domain= http_code= n=0 temp= url=
 	log_Skynet "[i] Update whitelist"
 	# Whitelist router, reserved IP addresses and static DNS:
@@ -407,7 +381,7 @@ load_Whitelist() {
 	# Whitelist domain:
 	for domain in $(echo "internic.net ipinfo.io $whitelist_domain $(echo "$blacklist_set" | strip_Domain) $(nvram get ntp_server0) $(nvram get ntp_server1)" | filter_Word); do
 		domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
-		n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
+		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
 	done
 	wait
 	# Whitelist root hints:
@@ -431,7 +405,7 @@ load_Whitelist() {
 
 
 load_Blacklist() {
-	[ "$option" = "cru" ] && return
+	if [ "$option" = "cru" ]; then return; fi
 	log_Skynet "[i] Update blacklist_ip/cidr"
 	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' > "$dir_temp/ipset"
 	ipset -q destroy "Skynet-Temp"
@@ -443,13 +417,13 @@ load_Blacklist() {
 
 
 load_Domain() {
-	[ $((updatecount % 48)) -ne 0 ] && return
+	if [ $((updatecount % 48)) -ne 0 ]; then return; fi
 	local domain= n=0
 	log_Skynet "[i] Update blacklist_domain"
 	true > "$dir_temp/ipset"
 	for domain in $(echo "$blacklist_domain" | filter_Word); do
 		domain_Lookup "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
-		n=$((n + 1)); [ $((n % 50)) -eq 0 ] && wait
+		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
 	done
 	wait
 	ipset -q destroy "Skynet-Temp"
@@ -461,7 +435,7 @@ load_Domain() {
 
 
 load_ASN() {
-	[ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ] && return
+	if [ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ]; then return; fi
 	local asn= n=0
 	log_Skynet "[i] Update blacklist_asn"
 	rm -f "$dir_reload/asn"
@@ -479,11 +453,12 @@ load_ASN() {
 			fi
 			rm -f "$temp"
 		) &
-		n=$((n + 1)); [ $((n % 10)) -eq 0 ] && wait
-		[ -f "$dir_reload/asn" ] && return
+		n=$((n + 1));
+		if [ $((n % 10)) -eq 0 ]; then wait; fi
+		if [ -f "$dir_reload/asn" ]; then return; fi
 	done
 	wait
-	[ -f "$dir_reload/asn" ] && return
+	if [ -f "$dir_reload/asn" ]; then return; fi
 	ipset -q destroy "Skynet-Temp"
 	ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" comment
 	ipset restore -! -f "$dir_temp/ipset"
@@ -554,7 +529,7 @@ download_Set() {
 	done < "$dir_temp/blacklist_set"
 
 	# Unload unlisted sets
-	[ "$option" = "cru" ] && return
+	if [ "$option" = "cru" ]; then return; fi
 	lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
 	for url in $(echo "$blacklist_set" | filter_URL); do
 		list="$list Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
@@ -579,26 +554,58 @@ download_Set() {
 }
 
 
-header() {
-	[ "$option" = "cru" ] && return
-	clear
-	sed -n '2,7s/#//p' "$0"
-	echo " Skynet Lite $version by Willem Bartels"
-	echo " Code is based on Skynet By Adamm"
-	echo
-	if [ -n "$1" ] || [ -n "$2" ]; then
-		echo "-----------------------------------------------------------"
-		printf " %-25s  %30s\n" "$1" "$2"
-		echo "-----------------------------------------------------------"
+############################
+#- Initialize Skynet Lite -#
+############################
+
+
+i=0
+while [ "$(nvram get ntp_ready)" = "0" ]; do
+	if [ $i -eq 0 ]; then log_Skynet "[i] Waiting for NTP to sync..."; fi
+	if [ $i -eq 300 ]; then
+		log_Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!"
+		touch "$dir_reload/all"
+		echo; exit 1;
 	fi
-}
+	i=$((i + 1)); sleep 1
+done
 
 
-footer() {
-	[ "$option" = "cru" ] && return
-	echo "-----------------------------------------------------------"
-	printf " %-25s  %30s\n\n" "Uptime $(file_Age "$file_installtime")" "$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
-}
+if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
+	for i in 1 2 3 4 5 6; do
+		if ping -q -w1 -c1 google.com >/dev/null 2>&1; then break; fi
+		if ping -q -w1 -c1 github.com >/dev/null 2>&1; then break; fi
+		if ping -q -w1 -c1 amazon.com >/dev/null 2>&1; then break; fi
+		if [ $i -eq 1 ]; then log_Skynet "[!] Waiting for internet connectivity..."; fi
+		if [ $i -eq 6 ]; then
+			log_Skynet "[*] Internet connectivity error"
+			touch "$dir_reload/all"
+			echo; exit 1
+		fi
+		sleep 9
+	done
+fi
+
+
+if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
+	throttle="1M"
+	if ! sleep=$(head -1 "$file_sleep" 2>/dev/null); then
+		sleep=$(rand 1 15)
+		echo "$sleep" > "$file_sleep"
+	fi
+	sleep $sleep
+fi
+
+
+lockfile="/tmp/var/lock/skynet.lock"
+exec 99>$lockfile
+flock -n 99
+if [ $? -ne 0 ]; then
+	log_Skynet "[i] An instance of Skynet Lite is already running"; echo; exit 1
+fi
+
+
+unset i sleep
 
 
 #######################
@@ -617,7 +624,7 @@ case "$command" in
 		touch "$file_installtime"
 		touch "$file_warninglog"
 		touch "$file_errorlog"
-		echo 0 > "$file_updatecount"
+		echo "0" > "$file_updatecount"
 		if [ "$0" != "/jffs/scripts/firewall" ]; then
 			mv -f "$0" "/jffs/scripts/firewall"
 			log_Skynet "[!] Skynet Lite moved to /jffs/scripts/firewall"
@@ -630,9 +637,9 @@ case "$command" in
 			chmod 755 "/jffs/scripts/firewall-start"
 			echo "sh /jffs/scripts/firewall" >> "/jffs/scripts/firewall-start"
 		fi
-		rand=$(printf '%d' 0x$(openssl rand 1 -hex)) # 0..255
-		m1=$((rand / 18 + 0));  m2=$((rand / 18 + 15))
-		m3=$((rand / 18 + 30)); m4=$((rand / 18 + 45))
+		rand=$(rand 0 14)
+		m1=$((rand + 0));  m2=$((rand + 15))
+		m3=$((rand + 30)); m4=$((rand + 45))
 		cru d Skynet_update
 		cru a Skynet_update "$m1,$m2,$m3,$m4 * * * * nice -n 19 sh /jffs/scripts/firewall update cru"
 		unload_IPTables
@@ -666,7 +673,7 @@ case "$command" in
 		fi
 		if [ -f "$dir_reload/all" ]; then
 			rm -f "$dir_reload/all"
-			updatecount=0
+			updatecount="0"
 		fi
 		load_Whitelist
 		load_Blacklist
@@ -730,10 +737,12 @@ case "$command" in
 
 	entries)
 		header "Blacklist" "Number of entries"
+		table=""
 		lookup=$(ipset list Skynet-Master | filter_Skynet | tr -d '"' | awk '{print $1, $7}')
-		for setname in $(echo "$lookup" | sort -k2 | awk '{print $1}'); do
-			printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(ipset list -terse "$setname" | grep -F 'Number of entries:' | grep -Eo '[0-9]+')"
+		for setname in $(echo "$lookup" | awk '{print $1}'); do
+			table=$(printf "$table\n$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}') $(ipset list -terse "$setname" | grep -F 'Number of entries' | grep -Eo '[0-9]+')")
 		done
+		echo "$table" | tail -n +2 | sort -k2gr | awk '{printf " %-40s  %15s\n", $1, $2}'
 		footer
 	;;
 
