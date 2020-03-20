@@ -83,7 +83,7 @@ option="$2"
 updatecount="0"
 throttle="0"
 iotblocked="disabled"
-version="1.14b"
+version="1.14c"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 
 
@@ -593,9 +593,8 @@ fi
 
 lockfile="/tmp/var/lock/skynet.lock"
 exec 99>$lockfile
-flock -n 99
-if [ $? -ne 0 ]; then
-	log_Skynet "[i] An instance of Skynet Lite is already running"; echo; exit 1
+if ! flock -n 99; then
+	echo "[i] Skynet Lite is locked, Please try again later"; echo; exit 1
 fi
 
 
