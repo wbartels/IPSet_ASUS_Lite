@@ -20,7 +20,7 @@
 #
 # Commands:
 # firewall
-# firewall 192.168.1.1
+# firewall 1.1.1.1
 # firewall fresh
 # firewall entries
 # firewall warning
@@ -28,6 +28,7 @@
 # firewall update
 # firewall reset
 # firewall uninstall
+# firewall help
 #
 # Readme:
 # The cron job is started every 15 minutes.
@@ -83,7 +84,7 @@ option="$2"
 updatecount="0"
 throttle="0"
 iotblocked="disabled"
-version="1.14d"
+version="1.14e"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 
 
@@ -96,7 +97,6 @@ dir_temp="$dir_skynet/temp"
 dir_update="$dir_skynet/update"
 file_errorlog="$dir_skynet/error.log"
 file_installtime="$dir_system/installtime"
-file_sleep="$dir_system/sleep"
 file_updatecount="$dir_system/updatecount"
 file_warninglog="$dir_skynet/warning.log"
 mkdir -p "$dir_cache1" "$dir_cache2" "$dir_reload"
@@ -588,11 +588,7 @@ fi
 
 if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
 	throttle="1M"
-	if ! sec=$(head -1 "$file_sleep" 2>/dev/null) || ! [ "$sec" -ge 0 ] 2>/dev/null; then
-		sec=$(rand 0 15)
-		echo "$sec" > "$file_sleep"
-	fi
-	sleep $sec
+	sleep 10
 fi
 
 
@@ -635,7 +631,7 @@ case "$command" in
 			chmod 755 "/jffs/scripts/firewall-start"
 			echo "sh /jffs/scripts/firewall" >> "/jffs/scripts/firewall-start"
 		fi
-		rand=$(rand 0 14)
+		rand=$(rand 1 14)
 		m1=$((rand + 0));  m2=$((rand + 15))
 		m3=$((rand + 30)); m4=$((rand + 45))
 		cru d Skynet_update
@@ -741,6 +737,22 @@ case "$command" in
 			table=$(printf "$table\n$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}') $(ipset list -terse "$setname" | grep -F 'Number of entries' | grep -Eo '[0-9]+')")
 		done
 		echo "$table" | tail -n +2 | sort -k2gr | awk '{printf " %-40s  %15s\n", $1, $2}'
+		footer
+	;;
+
+
+	help)
+		header "Commands"
+		echo " firewall"
+		echo " firewall 1.1.1.1"
+		echo " firewall fresh"
+		echo " firewall entries"
+		echo " firewall warning"
+		echo " firewall error"
+		echo " firewall update"
+		echo " firewall reset"
+		echo " firewall uninstall"
+		echo " firewall help"
 		footer
 	;;
 
