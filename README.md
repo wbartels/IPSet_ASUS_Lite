@@ -22,7 +22,7 @@ curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.
 ```Shell
 Commands;
 firewall
-firewall 192.168.1.1
+firewall 1.1.1.1
 firewall fresh
 firewall entries
 firewall warning
@@ -30,6 +30,7 @@ firewall error
 firewall update
 firewall reset
 firewall uninstall
+firewall help
 ```
 
 ### Donate to Skynet by Adamm
