@@ -85,7 +85,7 @@ updatecount="0"
 throttle="0"
 start_time="$(date +%s)"
 iotblocked="disabled"
-version="1.14f"
+version="1.14g"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 
 
@@ -592,7 +592,6 @@ if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
 	execution_time=$(($(date +%s) - start_time))
 	if [ $execution_time -lt 10 ] && [ $execution_time -ge 0 ]; then
 		sleep $((10 - execution_time))
-		exit
 	fi
 fi
 
