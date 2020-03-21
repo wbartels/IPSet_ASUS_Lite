@@ -85,7 +85,7 @@ updatecount="0"
 throttle="0"
 start_time="$(date +%s)"
 iotblocked="disabled"
-version="1.14g"
+version="1.15"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 
 
@@ -596,11 +596,9 @@ if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
 fi
 
 
-if [ "$command" = "update" ] || [ "$command" = "reset" ] || [ "$command" = "uninstall" ]; then
-	exec 99>/tmp/var/lock/skynet.lock
-	if ! flock -n 99; then
-		echo " [i] Skynet Lite is locked, please try again later"; echo; exit 1
-	fi
+exec 99>/tmp/var/lock/skynet.lock
+if ! flock -n 99; then
+	echo " [i] Skynet Lite is locked, please try again later"; echo; exit 1
 fi
 
 
