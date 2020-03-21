@@ -599,7 +599,7 @@ if ! flock -n 99; then
 fi
 
 
-unset i sec
+unset i
 
 
 #######################
