@@ -85,8 +85,9 @@ updatecount="0"
 throttle="0"
 start_time="$(date +%s)"
 iotblocked="disabled"
-version="1.15"
+version="1.16"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
+lockfile="/tmp/var/lock/skynet.lock"
 
 
 dir_skynet="/tmp/skynet"
@@ -596,7 +597,7 @@ if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
 fi
 
 
-exec 99>/tmp/var/lock/skynet.lock
+exec 99>"$lockfile"
 if ! flock -n 99; then
 	echo " [i] Skynet Lite is locked, please try again later"; echo; exit 1
 fi
@@ -683,7 +684,7 @@ case "$command" in
 
 	uninstall)
 		header "Uninstall"
-		log_Skynet "[*] Uninstall Skynet Lite"
+		log_Skynet "[*] Uninstall Skynet Lite..."
 		if [ -f "/jffs/scripts/firewall-start" ]; then
 			chmod 755 "/jffs/scripts/firewall-start"
 			config=$(grep -v "/jffs/scripts/firewall" "/jffs/scripts/firewall-start")
@@ -695,7 +696,7 @@ case "$command" in
 		unload_IPSets
 		rm -fr "$dir_skynet"
 		rm -f "$lockfile" "$0"
-		echo
+		echo " [i] Skynet Lite has been successfully uninstalled"; echo; exit 0
 	;;
 
 
@@ -787,6 +788,8 @@ case "$command" in
 esac
 
 
-log_Tail "$file_warninglog"
-log_Tail "$file_errorlog"
-rm -f "$dir_temp/"*
+if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
+	log_Tail "$file_warninglog"
+	log_Tail "$file_errorlog"
+	rm -f "$dir_temp/"*
+fi
