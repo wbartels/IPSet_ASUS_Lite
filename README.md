@@ -17,10 +17,9 @@ In your favorite SSH Client;
 curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && sh /jffs/scripts/firewall
 ```
 
-## Help
+## Commands
 
 ```Shell
-Commands;
 firewall
 firewall 1.1.1.1
 firewall fresh
