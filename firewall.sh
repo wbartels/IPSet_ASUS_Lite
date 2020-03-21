@@ -55,7 +55,7 @@ loginvalid="disabled"	# enabled | disabled
 blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {4}
 					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
-					<blocklist_net_ua>				https://blocklist.net.ua/blocklist.csv  {1}
+					<blocklist_net_ua>				https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
 					<ciarmy>						https://cinsscore.com/list/ci-badguys.txt  {1}
 					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
@@ -83,7 +83,7 @@ option="$2"
 updatecount="0"
 throttle="0"
 iotblocked="disabled"
-version="1.14c"
+version="1.14d"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 
 
@@ -96,6 +96,7 @@ dir_temp="$dir_skynet/temp"
 dir_update="$dir_skynet/update"
 file_errorlog="$dir_skynet/error.log"
 file_installtime="$dir_system/installtime"
+file_sleep="$dir_system/sleep"
 file_updatecount="$dir_system/updatecount"
 file_warninglog="$dir_skynet/warning.log"
 mkdir -p "$dir_cache1" "$dir_cache2" "$dir_reload"
@@ -233,7 +234,7 @@ filter_URL_Line() {
 
 
 filter_IP_CIDR() {
-	grep -oE '\b(((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})(\/(3[0-2]|[12]?[0-9]))?)\b'
+	grep -oE '\b((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})(\/(3[0-2]|[12]?[0-9]))?\b'
 }
 
 
@@ -248,7 +249,7 @@ filter_IP_Line() {
 
 
 is_IP() {
-	grep -oE '^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3})$'
+	grep -oE '^(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3}$'
 }
 
 
@@ -587,18 +588,22 @@ fi
 
 if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
 	throttle="1M"
-	sleep $(rand 0 15)
+	if ! sec=$(head -1 "$file_sleep" 2>/dev/null) || ! [ "$sec" -ge 0 ] 2>/dev/null; then
+		sec=$(rand 0 15)
+		echo "$sec" > "$file_sleep"
+	fi
+	sleep $sec
 fi
 
 
 lockfile="/tmp/var/lock/skynet.lock"
 exec 99>$lockfile
 if ! flock -n 99; then
-	echo "[i] Skynet Lite is locked, Please try again later"; echo; exit 1
+	echo "[i] Skynet Lite is locked, please try again later"; echo; exit 1
 fi
 
 
-unset i sleep
+unset i sec
 
 
 #######################
