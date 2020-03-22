@@ -85,7 +85,7 @@ updatecount="0"
 throttle="0"
 start_time="$(date +%s)"
 iotblocked="disabled"
-version="1.16"
+version="1.16b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -513,12 +513,17 @@ download_Set() {
 		http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
 		if [ $curl_exit -eq 0 ]; then
 			if [ "$http_code" = "304" ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
+				# 304 Not Modified and not in ipset
 				load_Set
 			elif [ "$http_code" = "304" ]; then
+				# 304 Not Modified
 				log_Skynet "[i] Fresh $comment"
 			elif [ -f "$cache" ] && cmp -s "$temp" "$cache" && ipset list -n "$setname" >/dev/null 2>&1; then
+				# Likely unsupported: If-Modified-Since / 304 Not Modified
 				log_Skynet "[!] Redownload $comment"
+				mv -f "$temp" "$cache"
 			else
+				# 200 OK
 				mv -f "$temp" "$cache"
 				load_Set
 			fi
