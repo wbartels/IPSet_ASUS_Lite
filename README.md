@@ -17,6 +17,14 @@ In your favorite SSH Client;
 curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && sh /jffs/scripts/firewall
 ```
 
+## Uninstall
+
+In your favorite SSH Client;
+
+```Shell
+sh /jffs/scripts/firewall uninstall
+```
+
 ## Commands
 
 ```Shell
