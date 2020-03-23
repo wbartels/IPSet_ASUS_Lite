@@ -57,7 +57,6 @@ blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/rep
 					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
 					<blocklist_net_ua>				https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
-					<ciarmy>						https://cinsscore.com/list/ci-badguys.txt  {1}
 					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
@@ -65,7 +64,7 @@ blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/rep
 					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
 					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
-					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {4}
+					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
 					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
 blacklist_ip=""
 blacklist_domain=""
@@ -81,11 +80,11 @@ whitelist_domain=""
 
 command="$1"
 option="$2"
-updatecount="0"
 throttle="0"
+updatecount="0"
 start_time="$(date +%s)"
 iotblocked="disabled"
-version="1.16b"
+version="1.16c"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -193,7 +192,7 @@ unload_IPSets() {
 	ipset -q destroy Skynet-ASN
 	ipset -q destroy Skynet-Temp
 	ipset -q destroy Skynet-Whitelist
-	ipset list -n | filter_Skynet_Set | xargs -I setname ipset -q destroy setname
+	ipset -n list | filter_Skynet_Set | xargs -I setname ipset -q destroy setname
 }
 
 
@@ -512,13 +511,13 @@ download_Set() {
 		cache="$dir_cache1/$setname"
 		http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
 		if [ $curl_exit -eq 0 ]; then
-			if [ "$http_code" = "304" ] && ! ipset list -n "$setname" >/dev/null 2>&1; then
+			if [ "$http_code" = "304" ] && ! ipset -n list "$setname" >/dev/null 2>&1; then
 				# 304 Not Modified and not in ipset
 				load_Set
 			elif [ "$http_code" = "304" ]; then
 				# 304 Not Modified
 				log_Skynet "[i] Fresh $comment"
-			elif [ -f "$cache" ] && cmp -s "$temp" "$cache" && ipset list -n "$setname" >/dev/null 2>&1; then
+			elif [ -f "$cache" ] && cmp -s "$temp" "$cache" && ipset -n list "$setname" >/dev/null 2>&1; then
 				# Likely unsupported: If-Modified-Since / 304 Not Modified
 				log_Skynet "[!] Redownload $comment"
 				mv -f "$temp" "$cache"
@@ -595,8 +594,11 @@ fi
 
 if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
 	throttle="1M"
+	updatecount=$(head -1 "$file_updatecount" 2>/dev/null)
+	updatecount=$((updatecount + 1))
+	echo "$updatecount" > "$file_updatecount"
 	execution_time=$(($(date +%s) - start_time))
-	if [ $execution_time -lt 10 ] && [ $execution_time -ge 0 ]; then
+	if [ $execution_time -ge 0 ] && [ $execution_time -lt 10 ]; then
 		sleep $((10 - execution_time))
 	fi
 fi
@@ -669,11 +671,6 @@ case "$command" in
 
 	update)
 		header "Update"
-		if [ "$option" = "cru" ]; then
-			updatecount=$(head -1 "$file_updatecount" 2>/dev/null)
-			updatecount=$((updatecount + 1))
-			echo "$updatecount" > "$file_updatecount"
-		fi
 		if [ -f "$dir_reload/all" ]; then
 			rm -f "$dir_reload/all"
 			updatecount="0"
@@ -743,7 +740,7 @@ case "$command" in
 		table=""
 		lookup=$(ipset list Skynet-Master | filter_Skynet | tr -d '"' | awk '{print $1, $7}')
 		for setname in $(echo "$lookup" | awk '{print $1}'); do
-			table=$(printf "$table\n$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}') $(ipset list -terse "$setname" | grep -F 'Number of entries' | grep -Eo '[0-9]+')")
+			table=$(printf "$table\n$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}') $(ipset -t list "$setname" | grep -F 'Number of entries' | grep -Eo '[0-9]+')")
 		done
 		echo "$table" | tail -n +2 | sort -k2gr | awk '{printf " %-40s  %15s\n", $1, $2}'
 		footer
@@ -787,7 +784,7 @@ case "$command" in
 
 	*)
 		header "Blacklist" "Packets blocked"
-		ipset list Skynet-Master | filter_Skynet | tr -d '"' | sort -k3,3gr -k7,7 | awk '{printf " %-40s  %15s\n", $7, $3}'
+		ipset list Skynet-Master | filter_Skynet | tr -d '"' | sort -k3,3gr -k7 | awk '{printf " %-40s  %15s\n", $7, $3}'
 		footer
 	;;
 esac
