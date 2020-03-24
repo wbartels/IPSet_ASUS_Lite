@@ -22,6 +22,7 @@
 # firewall
 # firewall 1.1.1.1
 # firewall fresh
+# firewall frequency
 # firewall entries
 # firewall warning
 # firewall error
@@ -84,7 +85,7 @@ throttle="0"
 updatecount="0"
 start_time="$(date +%s)"
 iotblocked="disabled"
-version="1.16c"
+version="1.17"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -314,15 +315,26 @@ curl_Error() {
 }
 
 
-file_Age() {
-	local sec=$(($(date +%s) - $(date +%s -r "$1" 2>/dev/null || date +%s)))
-	if [ $sec -lt 86400 ]; then
-		printf '%02d:%02d' $(($sec/3600)) $(($sec%3600/60))
-	elif [ $sec -lt 172800 ]; then
-		printf '1 day %02d:%02d' $(($sec%86400/3600)) $(($sec%3600/60))
+formatted_Time() {
+	if [ $1 -lt 86400 ]; then
+		printf '%02d:%02d' $(($1/3600)) $(($1%3600/60))
+	elif [ $1 -lt 172800 ]; then
+		printf '1 day %02d:%02d' $(($1%86400/3600)) $(($1%3600/60))
 	else
-		printf '%d days %02d:%02d' $(($sec/86400)) $(($sec%86400/3600)) $(($sec%3600/60))
+		printf '%d days %02d:%02d' $(($1/86400)) $(($1%86400/3600)) $(($1%3600/60))
 	fi
+}
+
+
+file_Age() {
+	formatted_Time $(($(date +%s) - $(date +%s -r "$1" 2>/dev/null || date +%s)))
+}
+
+
+update_Counter() {
+	n=$(head -1 "$1" 2>/dev/null)
+	n=$((n + 1))
+	echo "$n" | tee "$1"
 }
 
 
@@ -479,7 +491,7 @@ load_Set() {
 	ipset restore -! -f "$dir_temp/ipset"
 	ipset swap "$setname" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
-	date >> "$dir_update/$comment.log"; log_Tail "$dir_update/$comment.log"
+	update_Counter "$dir_update/$setname" > /dev/null
 }
 
 
@@ -547,8 +559,8 @@ download_Set() {
 		fi
 	done
 
-	# Cleanup cache and reload directory
-	for dir in "$dir_cache1" "$dir_reload"; do
+	# Cleanup cache, reload and update directory
+	for dir in "$dir_cache1" "$dir_reload" "$dir_update"; do
 		cd "$dir"
 		for setname in $(ls -1t | filter_Skynet_Set); do
 			if ! echo "$list" | grep -q "$setname"; then
@@ -594,9 +606,7 @@ fi
 
 if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
 	throttle="1M"
-	updatecount=$(head -1 "$file_updatecount" 2>/dev/null)
-	updatecount=$((updatecount + 1))
-	echo "$updatecount" > "$file_updatecount"
+	updatecount=$(update_Counter "$file_updatecount")
 	execution_time=$(($(date +%s) - start_time))
 	if [ $execution_time -ge 0 ] && [ $execution_time -lt 10 ]; then
 		sleep $((10 - execution_time))
@@ -735,6 +745,21 @@ case "$command" in
 	;;
 
 
+	frequency)
+		header "Blacklist" "Average update frequency"
+		installtime=$(date +%s -r "$file_installtime" 2>/dev/null || date +%s)
+		lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
+		for setname in $(echo "$lookup" | awk '{print $1}'); do
+			n=$(head -1 "$dir_update/$setname" 2>/dev/null); if [ "$n" = "" ]; then n="1"; fi
+			table=$(printf "$table\n$setname $((($(date +%s) - installtime) / n))")
+		done
+		echo "$table" | tail -n +2 | sort -k2g | while IFS=' ' read -r setname sec; do
+			printf " %-40s  %15s\n" $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}') $(formatted_Time $sec)
+		done
+		footer
+	;;
+
+
 	entries)
 		header "Blacklist" "Number of entries"
 		table=""
@@ -752,6 +777,7 @@ case "$command" in
 		echo " firewall"
 		echo " firewall 1.1.1.1"
 		echo " firewall fresh"
+		echo " firewall frequency"
 		echo " firewall entries"
 		echo " firewall warning"
 		echo " firewall error"
