@@ -85,7 +85,7 @@ throttle="0"
 updatecount="0"
 start_time="$(date +%s)"
 iotblocked="disabled"
-version="1.17"
+version="1.17b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -99,7 +99,6 @@ dir_temp="$dir_skynet/temp"
 dir_update="$dir_skynet/update"
 file_errorlog="$dir_skynet/error.log"
 file_installtime="$dir_system/installtime"
-file_updatecount="$dir_system/updatecount"
 file_warninglog="$dir_skynet/warning.log"
 mkdir -p "$dir_cache1" "$dir_cache2" "$dir_reload"
 mkdir -p "$dir_system" "$dir_temp" "$dir_update"
@@ -606,7 +605,7 @@ fi
 
 if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
 	throttle="1M"
-	updatecount=$(update_Counter "$file_updatecount")
+	updatecount=$(update_Counter "$dir_system/updatecount")
 	execution_time=$(($(date +%s) - start_time))
 	if [ $execution_time -ge 0 ] && [ $execution_time -lt 10 ]; then
 		sleep $((10 - execution_time))
@@ -639,7 +638,6 @@ case "$command" in
 		touch "$file_installtime"
 		touch "$file_warninglog"
 		touch "$file_errorlog"
-		echo "0" > "$file_updatecount"
 		if [ "$0" != "/jffs/scripts/firewall" ]; then
 			mv -f "$0" "/jffs/scripts/firewall"
 			log_Skynet "[!] Skynet Lite moved to /jffs/scripts/firewall"
@@ -735,11 +733,11 @@ case "$command" in
 
 
 	fresh)
-		header "Blacklist" "(server) Update time"
+		header "Blacklist" "Client file age"
 		lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
-		cd "$dir_cache1"
+		cd "$dir_update"
 		for setname in $(ls -1t | filter_Skynet_Set); do
-			printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(file_Age "$dir_cache1/$setname")"
+			printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(file_Age "$dir_update/$setname")"
 		done
 		footer
 	;;
