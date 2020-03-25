@@ -31,6 +31,7 @@ sh /jffs/scripts/firewall uninstall
 firewall
 firewall 1.1.1.1
 firewall fresh
+firewall frequency
 firewall entries
 firewall warning
 firewall error
