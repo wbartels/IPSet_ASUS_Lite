@@ -85,7 +85,7 @@ throttle="0"
 updatecount="0"
 start_time="$(date +%s)"
 iotblocked="disabled"
-version="1.17b"
+version="1.17c"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -325,8 +325,13 @@ formatted_Time() {
 }
 
 
-file_Age() {
-	formatted_Time $(($(date +%s) - $(date +%s -r "$1" 2>/dev/null || date +%s)))
+formatted_File_Age() {
+	formatted_Time $(($(date +%s) - $(file_Time "$1")))
+}
+
+
+file_Time() {
+	date +%s -r "$1" 2>/dev/null || echo $((date +%s - 5))
 }
 
 
@@ -361,7 +366,7 @@ header() {
 footer() {
 	if [ "$option" = "cru" ]; then return; fi
 	echo "-----------------------------------------------------------"
-	printf " %-25s  %30s\n\n" "Uptime $(file_Age "$file_installtime")" "$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
+	printf " %-25s  %30s\n\n" "Uptime $(formatted_File_Age "$file_installtime")" "$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
 }
 
 
@@ -635,6 +640,7 @@ case "$command" in
 		rm -f "$dir_reload/"*
 		rm -f "$dir_system/"*
 		rm -f "$dir_temp/"*
+		rm -f "$dir_update/"*
 		touch "$file_installtime"
 		touch "$file_warninglog"
 		touch "$file_errorlog"
@@ -737,7 +743,7 @@ case "$command" in
 		lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
 		cd "$dir_update"
 		for setname in $(ls -1t | filter_Skynet_Set); do
-			printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(file_Age "$dir_update/$setname")"
+			printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(formatted_File_Age "$dir_update/$setname")"
 		done
 		footer
 	;;
@@ -745,11 +751,10 @@ case "$command" in
 
 	frequency)
 		header "Blacklist" "Average update frequency"
-		installtime=$(date +%s -r "$file_installtime" 2>/dev/null || date +%s)
 		lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
 		for setname in $(echo "$lookup" | awk '{print $1}'); do
-			n=$(head -1 "$dir_update/$setname" 2>/dev/null); if [ "$n" = "" ]; then n="1"; fi
-			table=$(printf "$table\n$setname $((($(date +%s) - installtime) / n))")
+			n=$(head -1 "$dir_update/$setname" 2>/dev/null); if ! [ "$n" -gt 0 ] 2>/dev/null; then n="1"; fi
+			table=$(printf "$table\n$setname $((($(date +%s) - $(file_Time "$file_installtime")) / n))")
 		done
 		echo "$table" | tail -n +2 | sort -k2g | while IFS=' ' read -r setname sec; do
 			printf " %-40s  %15s\n" $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}') $(formatted_Time $sec)
