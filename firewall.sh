@@ -85,7 +85,7 @@ throttle="0"
 updatecount="0"
 start_time="$(date +%s)"
 iotblocked="disabled"
-version="1.17c"
+version="1.17d"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -716,6 +716,25 @@ case "$command" in
 	;;
 
 
+	"$ip")
+		header "Search for $ip"
+		if ipset -q test "Skynet-Whitelist" "$ip"; then
+			echo " [*] whitelist"
+		else
+			echo " [ ] whitelist"
+		fi
+		lookup=$(ipset list Skynet-Master | filter_Skynet | tr -d '"' | awk '{print $1, $7}')
+		for setname in $(echo "$lookup" | sort -k2 | awk '{print $1}'); do
+			if ipset -q test "$setname" "$ip"; then
+				echo " [*] $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
+			else
+				echo " [ ] $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
+			fi
+		done
+		footer
+	;;
+
+
 	warning)
 		header
 		if [ -f "$file_warninglog" ] && [ $(wc -l < "$file_warninglog") -ge 1 ]; then
@@ -757,7 +776,7 @@ case "$command" in
 			table=$(printf "$table\n$setname $((($(date +%s) - $(file_Time "$file_installtime")) / n))")
 		done
 		echo "$table" | tail -n +2 | sort -k2g | while IFS=' ' read -r setname sec; do
-			printf " %-40s  %15s\n" $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}') $(formatted_Time $sec)
+			printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(formatted_Time "$sec")"
 		done
 		footer
 	;;
@@ -788,25 +807,6 @@ case "$command" in
 		echo " firewall reset"
 		echo " firewall uninstall"
 		echo " firewall help"
-		footer
-	;;
-
-
-	"$ip")
-		header "Search for $ip"
-		if ipset -q test "Skynet-Whitelist" "$ip"; then
-			echo " [*] whitelist"
-		else
-			echo " [ ] whitelist"
-		fi
-		lookup=$(ipset list Skynet-Master | filter_Skynet | tr -d '"' | awk '{print $1, $7}')
-		for setname in $(echo "$lookup" | sort -k2 | awk '{print $1}'); do
-			if ipset -q test "$setname" "$ip"; then
-				echo " [*] $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
-			else
-				echo " [ ] $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
-			fi
-		done
 		footer
 	;;
 
