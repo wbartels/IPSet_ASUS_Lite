@@ -84,7 +84,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.17e"
+version="1.17f"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -101,19 +101,6 @@ file_installtime="$dir_system/installtime"
 file_warninglog="$dir_skynet/warning.log"
 mkdir -p "$dir_cache1" "$dir_cache2" "$dir_reload"
 mkdir -p "$dir_system" "$dir_temp" "$dir_update"
-
-
-if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
-	command="reset"
-	option=""
-fi
-
-
-if [ "$(nvram get wan0_proto)" = "pppoe" ]; then
-	iface="ppp0"
-else
-	iface="$(nvram get wan0_ifname)"
-fi
 
 
 ###############
@@ -589,7 +576,7 @@ while [ "$(nvram get ntp_ready)" = "0" ]; do
 	fi
 	i=$((i + 1)); sleep 1
 done
-start_time=$($(date +%s) - i)
+start_time=$(($(date +%s) - i))
 
 
 if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
@@ -621,6 +608,19 @@ fi
 exec 99>"$lockfile"
 if ! flock -n 99; then
 	echo " [i] Skynet Lite is locked, please try again later"; echo; exit 1
+fi
+
+
+if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
+	command="reset"
+	option=""
+fi
+
+
+if [ "$(nvram get wan0_proto)" = "pppoe" ]; then
+	iface="ppp0"
+else
+	iface="$(nvram get wan0_ifname)"
 fi
 
 
