@@ -83,9 +83,8 @@ command="$1"
 option="$2"
 throttle="0"
 updatecount="0"
-start_time="$(date +%s)"
 iotblocked="disabled"
-version="1.17d"
+version="1.17e"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -326,12 +325,12 @@ formatted_Time() {
 
 
 formatted_File_Age() {
-	formatted_Time $(($(date +%s) - $(file_Time "$1")))
+	formatted_Time $(file_Age "$1")
 }
 
 
-file_Time() {
-	date +%s -r "$1" 2>/dev/null || echo $((date +%s - 5))
+file_Age() {
+	echo $(($(date +%s) - $(date +%s -r "$1" 2>/dev/null || echo $start_time)))
 }
 
 
@@ -590,6 +589,7 @@ while [ "$(nvram get ntp_ready)" = "0" ]; do
 	fi
 	i=$((i + 1)); sleep 1
 done
+start_time=$($(date +%s) - i)
 
 
 if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
@@ -773,7 +773,7 @@ case "$command" in
 		lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
 		for setname in $(echo "$lookup" | awk '{print $1}'); do
 			n=$(head -1 "$dir_update/$setname" 2>/dev/null); if ! [ "$n" -gt 0 ] 2>/dev/null; then n="1"; fi
-			table=$(printf "$table\n$setname $((($(date +%s) - $(file_Time "$file_installtime")) / n))")
+			table=$(printf "$table\n$setname $(($(file_Age "$file_installtime") / n))")
 		done
 		echo "$table" | tail -n +2 | sort -k2g | while IFS=' ' read -r setname sec; do
 			printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(formatted_Time "$sec")"
