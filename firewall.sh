@@ -65,7 +65,7 @@ blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/rep
 					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
 					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
-					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
+					<talosintel>					https://talosintel.com/feeds/ip-filter.blf  {1}
 					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
 blacklist_ip=""
 blacklist_domain=""
@@ -84,7 +84,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.17g"
+version="1.17h"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -92,6 +92,7 @@ lockfile="/tmp/var/lock/skynet.lock"
 dir_skynet="/tmp/skynet"
 dir_cache1="$dir_skynet/cache1"
 dir_cache2="$dir_skynet/cache2"
+dir_debug="$dir_skynet/debug"
 dir_reload="$dir_skynet/reload"
 dir_system="$dir_skynet/system"
 dir_temp="$dir_skynet/temp"
@@ -99,7 +100,7 @@ dir_update="$dir_skynet/update"
 file_errorlog="$dir_skynet/error.log"
 file_installtime="$dir_system/installtime"
 file_warninglog="$dir_skynet/warning.log"
-mkdir -p "$dir_cache1" "$dir_cache2" "$dir_reload"
+mkdir -p "$dir_cache1" "$dir_cache2" "$dir_debug" "$dir_reload"
 mkdir -p "$dir_system" "$dir_temp" "$dir_update"
 
 
@@ -206,7 +207,9 @@ log_Skynet() {
 
 log_Tail() {
 	touch "$1"
-	tail -n 750 "$1" > "$dir_temp/log" && mv -f "$dir_temp/log" "$1"
+	if [ $(wc -l < "$1") -ge 700 ]; then
+		tail -n 675 "$1" > "$dir_temp/log" && mv -f "$dir_temp/log" "$1"
+	fi
 }
 
 
@@ -494,6 +497,7 @@ load_Set() {
 	ipset restore -! -f "$dir_temp/ipset"
 	ipset swap "$setname" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
+	date >> "$dir_debug/$comment.log"; log_Tail "$dir_debug/$comment.log"
 	update_Counter "$dir_update/$setname" > /dev/null
 }
 
@@ -637,6 +641,7 @@ case "$command" in
 	reset)
 		header "Reset"
 		log_Skynet "[i] Install"
+		rm -f "$dir_debug/"*
 		rm -f "$dir_reload/"*
 		rm -f "$dir_system/"*
 		rm -f "$dir_temp/"*
