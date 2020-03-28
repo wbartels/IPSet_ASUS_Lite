@@ -65,7 +65,7 @@ blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/rep
 					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
 					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
-					<talosintel>					https://talosintel.com/feeds/ip-filter.blf  {1}
+					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
 					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
 blacklist_ip=""
 blacklist_domain=""
@@ -84,7 +84,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.17h"
+version="1.17i"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -378,27 +378,35 @@ load_Whitelist() {
 	log_Skynet "[i] Update whitelist"
 	# Whitelist router, reserved IP addresses and static DNS:
 	echo "add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Whitelist: wan0_ipaddr\"
-	add Skynet-Temp $(nvram get wan0_gateway) comment \"Whitelist: wan0_gateway\"
-	add Skynet-Temp $(nvram get wan0_dns | awk '{print $1}') comment \"Whitelist: wan0_dns\"
-	add Skynet-Temp $(nvram get wan0_dns | awk '{print $2}') comment \"Whitelist: wan0_dns\"
-	add Skynet-Temp $(nvram get dhcp_dns1_x) comment \"Whitelist: dhcp_dns1_x\"
-	add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"
-	add Skynet-Temp 0.0.0.0/8 comment \"Whitelist: current network\"
-	add Skynet-Temp 10.0.0.0/8 comment \"Whitelist: private network\"
-	add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback addresses\"
-	add Skynet-Temp 169.254.0.0/16 comment \"Whitelist: link-local addresses\"
-	add Skynet-Temp 172.16.0.0/12 comment \"Whitelist: private network\"
-	add Skynet-Temp 192.168.0.0/16  comment \"Whitelist: private network\"
-	add Skynet-Temp 224.0.0.0/4  comment \"Whitelist: IP multicast\"
-	add Skynet-Temp 255.255.255.255/32 comment \"Whitelist: limited broadcast\"
-	add Skynet-Temp 8.8.8.8 comment \"Whitelist: Google Public DNS\"
-	add Skynet-Temp 8.8.4.4 comment \"Whitelist: Google Public DNS\"
-	add Skynet-Temp 1.1.1.1 comment \"Whitelist: Cloudflare DNS\"
-	add Skynet-Temp 1.0.0.1 comment \"Whitelist: Cloudflare DNS\"" | tr -d '\t' | filter_IP_Line > "$dir_temp/ipset"
+		add Skynet-Temp $(nvram get wan0_realip_ip) comment \"Whitelist: wan0_realip_ip\"
+		add Skynet-Temp $(nvram get wan0_gateway) comment \"Whitelist: wan0_gateway\"
+		add Skynet-Temp $(nvram get wan0_xgateway) comment \"Whitelist: wan0_xgateway\"
+		add Skynet-Temp $(nvram get wan0_dns | awk '{print $1}') comment \"Whitelist: wan0_dns\"
+		add Skynet-Temp $(nvram get wan0_dns | awk '{print $2}') comment \"Whitelist: wan0_dns\"
+		add Skynet-Temp $(nvram get dhcp_dns1_x) comment \"Whitelist: dhcp_dns1_x\"
+		add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"
+		add Skynet-Temp 0.0.0.0/8 comment \"Whitelist: current network\"
+		add Skynet-Temp 10.0.0.0/8 comment \"Whitelist: private network\"
+		add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback addresses\"
+		add Skynet-Temp 169.254.0.0/16 comment \"Whitelist: link-local addresses\"
+		add Skynet-Temp 172.16.0.0/12 comment \"Whitelist: private network\"
+		add Skynet-Temp 192.168.0.0/16  comment \"Whitelist: private network\"
+		add Skynet-Temp 224.0.0.0/4  comment \"Whitelist: IP multicast\"
+		add Skynet-Temp 255.255.255.255/32 comment \"Whitelist: limited broadcast\"
+		add Skynet-Temp 8.8.8.8 comment \"Whitelist: Google Public DNS\"
+		add Skynet-Temp 8.8.4.4 comment \"Whitelist: Google Public DNS\"
+		add Skynet-Temp 1.1.1.1 comment \"Whitelist: Cloudflare DNS\"
+		add Skynet-Temp 1.0.0.1 comment \"Whitelist: Cloudflare DNS\"" | tr -d '\t' | filter_IP_Line > "$dir_temp/ipset"
 	# Whitelist ip:
 	echo "$whitelist_ip" | filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$dir_temp/ipset"
 	# Whitelist domain:
-	for domain in $(echo "internic.net ipinfo.io $whitelist_domain $(echo "$blacklist_set" | strip_Domain) $(nvram get ntp_server0) $(nvram get ntp_server1)" | filter_Word); do
+	whitelist_domain="$whitelist_domain
+		internic.net
+		ipinfo.io
+		$(nvram get ntp_server0)
+		$(nvram get ntp_server1)
+		$(echo "$blacklist_set $(nvram get firmware_server)" | strip_Domain)"
+	for domain in $(echo "$whitelist_domain" | filter_Word); do
 		domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
 		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
 	done
