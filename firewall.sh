@@ -84,7 +84,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.17i"
+version="1.17j"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -200,8 +200,8 @@ log_Skynet() {
 	logger -t skynet "$1"
 	echo " $1" >&2
 	local type="$(echo "$1" | cut -c1-3)"
-	if [ "$type" = "[!]" ]; then echo "$(date) | $(echo "$1" | cut -c5-)" >> "$file_warninglog"; fi
-	if [ "$type" = "[*]" ]; then echo "$(date) | $(echo "$1" | cut -c5-)" >> "$file_errorlog"; fi
+	if [ "$type" = "[!]" ]; then echo "$(date -R) | $(echo "$1" | cut -c5-)" >> "$file_warninglog"; fi
+	if [ "$type" = "[*]" ]; then echo "$(date -R) | $(echo "$1" | cut -c5-)" >> "$file_errorlog"; fi
 }
 
 
@@ -505,7 +505,7 @@ load_Set() {
 	ipset restore -! -f "$dir_temp/ipset"
 	ipset swap "$setname" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
-	date >> "$dir_debug/$comment.log"; log_Tail "$dir_debug/$comment.log"
+	date -R >> "$dir_debug/$comment.log"; log_Tail "$dir_debug/$comment.log"
 	update_Counter "$dir_update/$setname" > /dev/null
 }
 
@@ -678,13 +678,13 @@ case "$command" in
 		unload_LogIPTables
 		unload_IPSets
 		echo 'create Skynet-Master list:set size 64 comment counters
-		create Skynet-Blacklist hash:net hashsize 64 comment
-		create Skynet-Domain hash:net hashsize 64 comment
-		create Skynet-ASN hash:net hashsize 64 comment
-		create Skynet-Whitelist hash:net hashsize 64 comment
-		add Skynet-Master Skynet-Blacklist comment "blacklist_ip/cidr"
-		add Skynet-Master Skynet-Domain comment "blacklist_domain"
-		add Skynet-Master Skynet-ASN comment "blacklist_asn"' | tr -d '\t' | ipset restore -!
+			create Skynet-Blacklist hash:net hashsize 64 comment
+			create Skynet-Domain hash:net hashsize 64 comment
+			create Skynet-ASN hash:net hashsize 64 comment
+			create Skynet-Whitelist hash:net hashsize 64 comment
+			add Skynet-Master Skynet-Blacklist comment "blacklist_ip/cidr"
+			add Skynet-Master Skynet-Domain comment "blacklist_domain"
+			add Skynet-Master Skynet-ASN comment "blacklist_asn"' | tr -d '\t' | ipset restore -!
 		load_IPTables
 		load_LogIPTables
 		load_Whitelist
