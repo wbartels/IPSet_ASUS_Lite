@@ -84,7 +84,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.17k"
+version="1.17l"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -242,7 +242,8 @@ filter_IP_CIDR() {
 
 
 filter_PrivateIP() {
-	grep -vE '^(0.|10\.|100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.|127\.|169\.254\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[0-1]\.|192\.168\.|22[4-9]\.|23[0-9]\.|255\.255\.255\.255|8\.8\.8\.8|8\.8\.4\.4|1\.1\.1\.1|1\.0\.0\.1)'
+	# https://regex101.com/r/YLJ9M3/1
+	grep -vE '^(0.|10\.|100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.|127\.|169\.254\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[0-1]\.|192\.0\.0|192\.168\.|198\.(1[8-9])\.|22[4-9]\.|23[0-9]\.|255\.255\.255\.255|8\.8\.8\.8|8\.8\.4\.4|1\.1\.1\.1|1\.0\.0\.1)'
 }
 
 
@@ -391,7 +392,9 @@ load_Whitelist() {
 		add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback\"
 		add Skynet-Temp 169.254.0.0/16 comment \"Whitelist: link local\"
 		add Skynet-Temp 172.16.0.0/12 comment \"Whitelist: private network\"
+		add Skynet-Temp 192.0.0.0/24 comment \"Whitelist: IETF protocol assignments\"
 		add Skynet-Temp 192.168.0.0/16 comment \"Whitelist: private network\"
+		add Skynet-Temp 198.18.0.0/15 comment \"Whitelist: network interconnect device benchmark testing\"
 		add Skynet-Temp 224.0.0.0/4 comment \"Whitelist: multicast\"
 		add Skynet-Temp 255.255.255.255/32 comment \"Whitelist: limited broadcast\"
 		add Skynet-Temp 8.8.8.8 comment \"Whitelist: Google Public DNS\"
