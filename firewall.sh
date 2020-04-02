@@ -84,7 +84,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.17l"
+version="1.17m"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -242,8 +242,8 @@ filter_IP_CIDR() {
 
 
 filter_PrivateIP() {
-	# https://regex101.com/r/YLJ9M3/1
-	grep -vE '^(0.|10\.|100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.|127\.|169\.254\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[0-1]\.|192\.0\.0|192\.168\.|198\.(1[8-9])\.|22[4-9]\.|23[0-9]\.|255\.255\.255\.255|8\.8\.8\.8|8\.8\.4\.4|1\.1\.1\.1|1\.0\.0\.1)'
+	# https://regex101.com/r/YLJ9M3/3
+	grep -vE '^(0\.|10\.|100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.|127\.|169\.254\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[0-1]\.|192\.0\.0\.|192\.0\.2\.|192\.168\.|198\.(1[8-9])\.|198\.51\.100\.|203\.0\.113\.|2(2[4-9]|[3-4][0-9]|5[0-5])\.|8\.8\.8\.8|8\.8\.4\.4|1\.1\.1\.1|1\.0\.0\.1)'
 }
 
 
@@ -386,17 +386,19 @@ load_Whitelist() {
 		add Skynet-Temp $(nvram get wan0_dns | awk '{print $2}') comment \"Whitelist: wan0_dns\"
 		add Skynet-Temp $(nvram get dhcp_dns1_x) comment \"Whitelist: dhcp_dns1_x\"
 		add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"
-		add Skynet-Temp 0.0.0.0/8 comment \"Whitelist: this network\"
-		add Skynet-Temp 10.0.0.0/8 comment \"Whitelist: private network\"
-		add Skynet-Temp 100.64.0.0/10 comment \"Whitelist: carrier-grade NAT\"
-		add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: loopback\"
-		add Skynet-Temp 169.254.0.0/16 comment \"Whitelist: link local\"
-		add Skynet-Temp 172.16.0.0/12 comment \"Whitelist: private network\"
+		add Skynet-Temp 0.0.0.0/8 comment \"Whitelist: This network\"
+		add Skynet-Temp 10.0.0.0/8 comment \"Whitelist: Private network\"
+		add Skynet-Temp 100.64.0.0/10 comment \"Whitelist: Carrier-grade NAT\"
+		add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: Loopback\"
+		add Skynet-Temp 169.254.0.0/16 comment \"Whitelist: Link local\"
+		add Skynet-Temp 172.16.0.0/12 comment \"Whitelist: Private network\"
 		add Skynet-Temp 192.0.0.0/24 comment \"Whitelist: IETF protocol assignments\"
-		add Skynet-Temp 192.168.0.0/16 comment \"Whitelist: private network\"
-		add Skynet-Temp 198.18.0.0/15 comment \"Whitelist: network interconnect device benchmark testing\"
-		add Skynet-Temp 224.0.0.0/4 comment \"Whitelist: multicast\"
-		add Skynet-Temp 255.255.255.255/32 comment \"Whitelist: limited broadcast\"
+		add Skynet-Temp 192.0.2.0/24 comment \"Whitelist: TEST-NET-1\"
+		add Skynet-Temp 192.168.0.0/16 comment \"Whitelist: Private network\"
+		add Skynet-Temp 198.18.0.0/15 comment \"Whitelist: Network interconnect device benchmark testing\"
+		add Skynet-Temp 198.51.100.0/24 comment \"Whitelist: TEST-NET-2\"
+		add Skynet-Temp 203.0.113.0/24 comment \"Whitelist: TEST-NET-3\"
+		add Skynet-Temp 224.0.0.0/3 comment \"Whitelist: Multicast/reserved/limited broadcast\"
 		add Skynet-Temp 8.8.8.8 comment \"Whitelist: Google Public DNS\"
 		add Skynet-Temp 8.8.4.4 comment \"Whitelist: Google Public DNS\"
 		add Skynet-Temp 1.1.1.1 comment \"Whitelist: Cloudflare DNS\"
