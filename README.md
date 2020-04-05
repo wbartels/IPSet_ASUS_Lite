@@ -10,8 +10,12 @@ Skynet Lite relies on the IPTables from Skynet by Adamm.
 - To prevent downtime use the ipset swap feature.
 
 ## Installation
+Ensure you have de [Asuswrt-merlin](https://www.asuswrt-merlin.net/) firmware and the JFFS2 partition enabled:
+```
+Administration > System > Enable JFFS custom scripts and configs: Yes > Apply
+```
 
-In your favorite SSH Client;
+In your favorite SSH Client:
 
 ```Shell
 curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && sh /jffs/scripts/firewall
@@ -19,7 +23,7 @@ curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.
 
 ## Uninstall
 
-In your favorite SSH Client;
+In your favorite SSH Client:
 
 ```Shell
 sh /jffs/scripts/firewall uninstall
