@@ -61,10 +61,10 @@ blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/rep
 					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<maxmind_high_risk>				https://www.maxmind.com/en/high-risk-ip-sample-list  {12}
+					<maxmind_high_risk>				https://www.maxmind.com/en/high-risk-ip-sample-list  {16}
 					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
-					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {12}
-					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {12}
+					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {16}
+					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {16}
 					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
 					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
 blacklist_ip=""
@@ -84,7 +84,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.17p"
+version="1.17q"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -402,15 +402,17 @@ load_Whitelist() {
 	# Whitelist ip:
 	echo "$whitelist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$dir_temp/ipset"
 	# Whitelist domain:
-	whitelist_domain="$whitelist_domain
-		ipinfo.io internic.net
+	whitelist_domain="$whitelist_domain $(echo "$blacklist_set $(nvram get firmware_server)" | strip_Domain)
+		internic.net
+		ipinfo.io
+		raw.githubusercontent.com
 		dns.adguard.com
 		dns.google
 		dns.opendns.com
 		dns.quad9.net
 		one.one.one.one
-		$(nvram get ntp_server0) $(nvram get ntp_server1)
-		$(echo "$blacklist_set $(nvram get firmware_server)" | strip_Domain)"
+		$(nvram get ntp_server0)
+		$(nvram get ntp_server1)"
 	for domain in $(echo "$whitelist_domain" | filter_Word); do
 		domain_Lookup "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
 		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
