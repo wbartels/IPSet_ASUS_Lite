@@ -84,7 +84,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.17o"
+version="1.17p"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -242,8 +242,8 @@ filter_IP_CIDR() {
 
 
 filter_PrivateIP() {
-	# https://regex101.com/r/YLJ9M3/5
-	grep -vE '^(0\.|10\.|100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.|127\.|169\.254\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[0-1]\.|192\.0\.0\.|192\.0\.2\.|192\.168\.|198\.1[8-9]\.|198\.51\.100\.|203\.0\.113\.|2(2[4-9]|[3-4][0-9]|5[0-5])\.|8\.8\.8\.8|8\.8\.4\.4|1\.1\.1\.1|1\.0\.0\.1|176\.103\.130\.13[0-1])'
+	# https://regex101.com/r/vDjcX3/1
+	grep -vE '^(0\.|10\.|100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.|127\.|169\.254\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[0-1]\.|192\.0\.0\.|192\.0\.2\.|192\.168\.|198\.1[8-9]\.|198\.51\.100\.|203\.0\.113\.|2(2[4-9]|[3-4][0-9]|5[0-5])\.)'
 }
 
 
@@ -400,19 +400,19 @@ load_Whitelist() {
 		add Skynet-Temp 203.0.113.0/24 comment \"Whitelist: TEST-NET-3\"
 		add Skynet-Temp 224.0.0.0/3 comment \"Whitelist: Multicast/reserved/limited broadcast\"" | tr -d '\t' | filter_IP_Line > "$dir_temp/ipset"
 	# Whitelist ip:
-	echo "$whitelist_ip" | filter_IP_CIDR | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$dir_temp/ipset"
+	echo "$whitelist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$dir_temp/ipset"
 	# Whitelist domain:
 	whitelist_domain="$whitelist_domain
-		internic.net
-		ipinfo.io
-		dns.google
-		one.one.one.one
+		ipinfo.io internic.net
 		dns.adguard.com
-		$(nvram get ntp_server0)
-		$(nvram get ntp_server1)
+		dns.google
+		dns.opendns.com
+		dns.quad9.net
+		one.one.one.one
+		$(nvram get ntp_server0) $(nvram get ntp_server1)
 		$(echo "$blacklist_set $(nvram get firmware_server)" | strip_Domain)"
 	for domain in $(echo "$whitelist_domain" | filter_Word); do
-		domain_Lookup "$domain" | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
+		domain_Lookup "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
 		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
 	done
 	wait
