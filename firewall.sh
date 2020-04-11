@@ -84,7 +84,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.17q"
+version="1.17r"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -426,7 +426,7 @@ load_Whitelist() {
 		mv -f "$temp" "$cache"
 	fi
 	if [ -f "$cache" ]; then
-		< "$cache" filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' >> "$dir_temp/ipset"
+		filter_IP_CIDR < "$cache" | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' >> "$dir_temp/ipset"
 	fi
 	rm -f "$temp";
 	# Update ipset:
@@ -480,7 +480,7 @@ load_ASN() {
 			temp="$dir_temp/$asn"
 			http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url"); curl_exit=$?
 			if [ $curl_exit -eq 0 ]; then
-				< "$temp" filter_IP_CIDR | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
+				filter_IP_CIDR < "$temp" | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
 			else
 				log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $curl_exit) $url"
 				touch "$dir_reload/asn"
@@ -502,7 +502,7 @@ load_ASN() {
 
 load_Set() {
 	log_Skynet "[i] Update $comment"
-	< "$cache" filter_IP_CIDR | filter_PrivateIP | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' > "$dir_temp/ipset"
+	filter_IP_CIDR < "$cache" | filter_PrivateIP | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' > "$dir_temp/ipset"
 	if ! ipset list -n "$setname" >/dev/null 2>&1; then
 		ipset create "$setname" hash:net hashsize 64 maxelem 262144 comment
 		ipset add Skynet-Master "$setname" comment "$comment"
