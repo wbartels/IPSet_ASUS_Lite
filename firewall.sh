@@ -39,8 +39,9 @@
 # Both the <comment> and {n} tag are optional.
 # The order of the url and tags are not important, but need to be on the same line.
 #
-# The other lists (ip, domain and asn) can contain multiple items per line.
-# The items on these lists can be separated with a space, tab or newline.
+# The other lists (ip, domain and asn) can contain multiple items per list.
+# The items on these lists must be separated with a space, tab or newline.
+# blacklist_ip, blacklist_domain and blacklist_asn can optional use one global <comment> tag.
 #
 
 
@@ -84,10 +85,9 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.17r"
+version="1.18"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
-
 
 dir_skynet="/tmp/skynet"
 dir_cache1="$dir_skynet/cache1"
@@ -97,9 +97,6 @@ dir_reload="$dir_skynet/reload"
 dir_system="$dir_skynet/system"
 dir_temp="$dir_skynet/temp"
 dir_update="$dir_skynet/update"
-file_errorlog="$dir_skynet/error.log"
-file_installtime="$dir_system/installtime"
-file_warninglog="$dir_skynet/warning.log"
 mkdir -p "$dir_cache1" "$dir_cache2" "$dir_debug" "$dir_reload"
 mkdir -p "$dir_system" "$dir_temp" "$dir_update"
 
@@ -196,24 +193,7 @@ unload_IPSets() {
 }
 
 
-log_Skynet() {
-	logger -t skynet "$1"
-	echo " $1" >&2
-	local type="$(echo "$1" | cut -c1-3)"
-	if [ "$type" = "[!]" ]; then echo "$(date -R) | $(echo "$1" | cut -c5-)" >> "$file_warninglog"; fi
-	if [ "$type" = "[*]" ]; then echo "$(date -R) | $(echo "$1" | cut -c5-)" >> "$file_errorlog"; fi
-}
-
-
-log_Tail() {
-	touch "$1"
-	if [ $(wc -l < "$1") -ge 700 ]; then
-		tail -n 675 "$1" > "$dir_temp/log" && mv -f "$dir_temp/log" "$1"
-	fi
-}
-
-
-domain_Lookup() {
+lookup_Domain() {
 	set -o pipefail; nslookup "$1" 2>/dev/null | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk 'NR>2'
 	if [ $? -ne 0 ]; then
 		log_Skynet "[*] nslookup can't resolve $1"
@@ -223,6 +203,11 @@ domain_Lookup() {
 
 strip_Domain() {
 	grep -oE 'https?://\S+' | cut -d'/' -f3 | awk '!x[$0]++'
+}
+
+
+filter_Domain() {
+	awk '{gsub("<.+>", ""); print}' | grep -oE '\b(([a-z](-?[a-z0-9])*)\.)+[a-z]{2,}\b'
 }
 
 
@@ -262,13 +247,8 @@ filter_ASN() {
 }
 
 
-filter_Word() {
-	grep -oE '\b\S+\b'
-}
-
-
 filter_Comment() {
-	grep -oE '<.+>' | tr -d '<>' | tr ' ' '_'
+	grep -oE '<.+>' | tr -d '<>' | tr ',' ';'
 }
 
 
@@ -314,6 +294,40 @@ curl_Error() {
 		61) echo -n "Bad content encoding" ;;
 		*)  echo -n "Error $1 returned by curl" ;;
 	esac
+}
+
+
+log_Skynet() {
+	logger -t skynet "$1"
+	echo " $1" >&2
+	local type="$(echo "$1" | cut -c1-3)"
+	if [ "$type" = "[!]" ]; then echo "$(date -R) | $(echo "$1" | cut -c5-)" >> "$dir_skynet/warning.log"; fi
+	if [ "$type" = "[*]" ]; then echo "$(date -R) | $(echo "$1" | cut -c5-)" >> "$dir_skynet/error.log"; fi
+}
+
+
+log_Tail() {
+	touch "$1"
+	if [ $(wc -l < "$1") -ge 700 ]; then
+		tail -n 675 "$1" > "$dir_temp/log" && mv -f "$dir_temp/log" "$1"
+	fi
+}
+
+
+lookup_Initialize() {
+	local comment
+	comment=$(echo "$blacklist_ip" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_ip"; fi; echo "Skynet-Blacklist,$comment" > "$dir_temp/lookup.csv"
+	comment=$(echo "$blacklist_domain" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_domain"; fi; echo "Skynet-Domain,$comment" >> "$dir_temp/lookup.csv"
+	comment=$(echo "$blacklist_asn" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_asn"; fi; echo "Skynet-ASN,$comment" >> "$dir_temp/lookup.csv"
+}
+
+
+lookup_Comment() {
+	if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
+		awk -F, -v setname="$1" '$1 == setname {print $2}' "$dir_temp/lookup.csv"
+	else
+		awk -F, -v setname="$1" '$1 == setname {print $2}' "$dir_system/lookup.csv"
+	fi
 }
 
 
@@ -369,7 +383,7 @@ header() {
 footer() {
 	if [ "$option" = "cru" ]; then return; fi
 	echo "-----------------------------------------------------------"
-	printf " %-25s  %30s\n\n" "Uptime $(formatted_File_Age "$file_installtime")" "$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
+	printf " %-25s  %30s\n\n" "Uptime $(formatted_File_Age "$dir_system/installtime")" "$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
 }
 
 
@@ -413,8 +427,8 @@ load_Whitelist() {
 		one.one.one.one
 		$(nvram get ntp_server0)
 		$(nvram get ntp_server1)"
-	for domain in $(echo "$whitelist_domain" | filter_Word); do
-		domain_Lookup "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
+	for domain in $(echo "$whitelist_domain" | filter_Domain); do
+		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
 		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
 	done
 	wait
@@ -440,7 +454,7 @@ load_Whitelist() {
 
 load_Blacklist() {
 	if [ "$option" = "cru" ]; then return; fi
-	log_Skynet "[i] Update blacklist_ip/cidr"
+	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Blacklist')"
 	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' > "$dir_temp/ipset"
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" comment
@@ -453,10 +467,10 @@ load_Blacklist() {
 load_Domain() {
 	if [ $((updatecount % 48)) -ne 0 ]; then return; fi
 	local domain= n=0
-	log_Skynet "[i] Update blacklist_domain"
+	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Domain')"
 	true > "$dir_temp/ipset"
-	for domain in $(echo "$blacklist_domain" | filter_Word); do
-		domain_Lookup "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
+	for domain in $(echo "$blacklist_domain" | filter_Domain); do
+		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
 		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
 	done
 	wait
@@ -471,7 +485,7 @@ load_Domain() {
 load_ASN() {
 	if [ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ]; then return; fi
 	local asn= n=0
-	log_Skynet "[i] Update blacklist_asn"
+	log_Skynet "[i] Update $(lookup_Comment 'Skynet-ASN')"
 	rm -f "$dir_reload/asn"
 	true > "$dir_temp/ipset"
 	for asn in $(echo "$blacklist_asn" | filter_ASN); do
@@ -528,8 +542,10 @@ download_Set() {
 		setname="Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
 
 		if [ -z "$comment" ]; then
-			comment=$(basename "$url")
+			comment=$(filter_Comment "<$(basename "$url")>")
 		fi
+		echo "$setname,$comment" >> "$dir_temp/lookup.csv"
+
 		if [ -z "$update_cycles" ]; then
 			update_cycles=4
 		fi
@@ -566,16 +582,12 @@ download_Set() {
 		fi
 		rm -f "$temp"
 	done < "$dir_temp/blacklist_set"
+	sort -t, -k2 < "$dir_temp/lookup.csv" > "$dir_system/lookup.csv"
 
 	# Unload unlisted sets
-	if [ "$option" = "cru" ]; then return; fi
-	lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
-	for url in $(echo "$blacklist_set" | filter_URL); do
-		list="$list Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
-	done
-	for setname in $(echo "$lookup" | sort -k2 | awk '{print $1}'); do
+	list=$(awk -F, '{print $1}' "$dir_system/lookup.csv" | filter_Skynet_Set)
+	for setname in $(ipset list Skynet-Master | filter_Skynet_Set | awk '{print $1}'); do
 		if ! echo "$list" | grep -q "$setname"; then
-			log_Skynet "[i] Unload $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
 			ipset -q del "Skynet-Master" "$setname"
 			ipset -q destroy "$setname"
 		fi
@@ -661,9 +673,9 @@ case "$command" in
 		rm -f "$dir_system/"*
 		rm -f "$dir_temp/"*
 		rm -f "$dir_update/"*
-		touch "$file_installtime"
-		touch "$file_warninglog"
-		touch "$file_errorlog"
+		touch "$dir_skynet/warning.log"
+		touch "$dir_skynet/error.log"
+		touch "$dir_system/installtime"
 		if [ "$0" != "/jffs/scripts/firewall" ]; then
 			mv -f "$0" "/jffs/scripts/firewall"
 			log_Skynet "[!] Skynet Lite moved to /jffs/scripts/firewall"
@@ -681,6 +693,7 @@ case "$command" in
 		m3=$((rand + 30)); m4=$((rand + 45))
 		cru d Skynet_update
 		cru a Skynet_update "$m1,$m2,$m3,$m4 * * * * nice -n 19 sh /jffs/scripts/firewall update cru"
+		lookup_Initialize
 		unload_IPTables
 		unload_LogIPTables
 		unload_IPSets
@@ -689,7 +702,7 @@ case "$command" in
 			create Skynet-Domain hash:net hashsize 64 comment
 			create Skynet-ASN hash:net hashsize 64 comment
 			create Skynet-Whitelist hash:net hashsize 64 comment
-			add Skynet-Master Skynet-Blacklist comment "blacklist_ip/cidr"
+			add Skynet-Master Skynet-Blacklist comment "blacklist_ip"
 			add Skynet-Master Skynet-Domain comment "blacklist_domain"
 			add Skynet-Master Skynet-ASN comment "blacklist_asn"' | tr -d '\t' | ipset restore -!
 		load_IPTables
@@ -709,6 +722,7 @@ case "$command" in
 			rm -f "$dir_reload/all"
 			updatecount="0"
 		fi
+		lookup_Initialize
 		load_Whitelist
 		load_Blacklist
 		load_Domain
@@ -743,12 +757,11 @@ case "$command" in
 		else
 			echo " [ ] whitelist"
 		fi
-		lookup=$(ipset list Skynet-Master | filter_Skynet | tr -d '"' | awk '{print $1, $7}')
-		for setname in $(echo "$lookup" | sort -k2 | awk '{print $1}'); do
+		for setname in $(awk -F, '{print $1}' "$dir_system/lookup.csv"); do
 			if ipset -q test "$setname" "$ip"; then
-				echo " [*] $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
+				echo " [*] $(lookup_Comment "$setname")"
 			else
-				echo " [ ] $(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')"
+				echo " [ ] $(lookup_Comment "$setname")"
 			fi
 		done
 		footer
@@ -757,8 +770,8 @@ case "$command" in
 
 	warning)
 		header
-		if [ -f "$file_warninglog" ] && [ $(wc -l < "$file_warninglog") -ge 1 ]; then
-			cat "$file_warninglog"
+		if [ -f "$dir_skynet/warning.log" ] && [ $(wc -l < "$dir_skynet/warning.log") -ge 1 ]; then
+			cat "$dir_skynet/warning.log"
 		else
 			echo "Empty warning.log"
 		fi
@@ -768,8 +781,8 @@ case "$command" in
 
 	error)
 		header
-		if [ -f "$file_errorlog" ] && [ $(wc -l < "$file_errorlog") -ge 1 ]; then
-			cat "$file_errorlog"
+		if [ -f "$dir_skynet/error.log" ] && [ $(wc -l < "$dir_skynet/error.log") -ge 1 ]; then
+			cat "$dir_skynet/error.log"
 		else
 			echo "Empty error.log"
 		fi
@@ -779,10 +792,9 @@ case "$command" in
 
 	fresh)
 		header "Blacklist" "Client file age"
-		lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
 		cd "$dir_update"
 		for setname in $(ls -1t | filter_Skynet_Set); do
-			printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(formatted_File_Age "$dir_update/$setname")"
+			printf " %-40s  %15s\n" "$(lookup_Comment "$setname")" "$(formatted_File_Age "$dir_update/$setname")"
 		done
 		footer
 	;;
@@ -790,26 +802,24 @@ case "$command" in
 
 	frequency)
 		header "Blacklist" "Average update frequency"
-		lookup=$(ipset list Skynet-Master | filter_Skynet_Set | tr -d '"' | awk '{print $1, $7}')
-		for setname in $(echo "$lookup" | awk '{print $1}'); do
-			n=$(head -1 "$dir_update/$setname" 2>/dev/null); if ! [ "$n" -gt 0 ] 2>/dev/null; then n="1"; fi
-			table=$(printf "$table\n$setname $(($(file_Age "$file_installtime") / n))")
+		true > "$dir_temp/csv"
+		for setname in $(awk -F, '{print $1}' "$dir_system/lookup.csv" | filter_Skynet_Set); do
+			n=$(head -1 "$dir_update/$setname" 2>/dev/null); if ! [ "$n" -gt 0 ] 2>/dev/null; then n=1; fi
+			sec=$(($(file_Age "$dir_system/installtime") / n))
+			echo "$(lookup_Comment "$setname"),$(formatted_Time "$sec"),$sec" >> "$dir_temp/csv"
 		done
-		echo "$table" | tail -n +2 | sort -k2g | while IFS=' ' read -r setname sec; do
-			printf " %-40s  %15s\n" "$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}')" "$(formatted_Time "$sec")"
-		done
+		sort -t, -k3n < "$dir_temp/csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
 		footer
 	;;
 
 
 	entries)
 		header "Blacklist" "Number of entries"
-		table=""
-		lookup=$(ipset list Skynet-Master | filter_Skynet | tr -d '"' | awk '{print $1, $7}')
-		for setname in $(echo "$lookup" | awk '{print $1}'); do
-			table=$(printf "$table\n$(echo "$lookup" | awk -v setname="$setname" '$1 == setname {print $2}') $(ipset -t list "$setname" | grep -F 'Number of entries' | grep -Eo '[0-9]+')")
+		true > "$dir_temp/csv"
+		for setname in $(awk -F, '{print $1}' "$dir_system/lookup.csv"); do
+			echo "$(lookup_Comment "$setname"),$(ipset -t list "$setname" | grep -F 'Number of entries' | grep -Eo '[0-9]+')" >> "$dir_temp/csv"
 		done
-		echo "$table" | tail -n +2 | sort -k2gr | awk '{printf " %-40s  %15s\n", $1, $2}'
+		sort -t, -k2nr < "$dir_temp/csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
 		footer
 	;;
 
@@ -833,14 +843,18 @@ case "$command" in
 
 	*)
 		header "Blacklist" "Packets blocked"
-		ipset list Skynet-Master | filter_Skynet | tr -d '"' | sort -k3,3gr -k7 | awk '{printf " %-40s  %15s\n", $7, $3}'
+		true > "$dir_temp/csv"
+		ipset list Skynet-Master | filter_Skynet | awk '{print $1","$3}' | while IFS=',' read -r setname blocked; do
+			echo "$(lookup_Comment "$setname"),$blocked" >> "$dir_temp/csv"
+		done
+		sort -t, -k2nr -k1,1 < "$dir_temp/csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
 		footer
 	;;
 esac
 
 
 if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
-	log_Tail "$file_warninglog"
-	log_Tail "$file_errorlog"
+	log_Tail "$dir_skynet/warning.log"
+	log_Tail "$dir_skynet/error.log"
 	rm -f "$dir_temp/"*
 fi
