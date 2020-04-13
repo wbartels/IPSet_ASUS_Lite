@@ -85,7 +85,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.18"
+version="1.18b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -315,19 +315,19 @@ log_Tail() {
 
 
 lookup_Initialize() {
-	local comment
-	comment=$(echo "$blacklist_ip" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_ip"; fi; echo "Skynet-Blacklist,$comment" > "$dir_temp/lookup.csv"
+	local comment=$(echo "$blacklist_ip" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_ip"; fi; echo "Skynet-Blacklist,$comment" > "$dir_temp/lookup.csv"
 	comment=$(echo "$blacklist_domain" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_domain"; fi; echo "Skynet-Domain,$comment" >> "$dir_temp/lookup.csv"
 	comment=$(echo "$blacklist_asn" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_asn"; fi; echo "Skynet-ASN,$comment" >> "$dir_temp/lookup.csv"
 }
 
 
+lookup_Update_Comment() {
+	awk -F, -v setname="$1" '$1 == setname {print $2}' "$dir_temp/lookup.csv"
+}
+
+
 lookup_Comment() {
-	if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
-		awk -F, -v setname="$1" '$1 == setname {print $2}' "$dir_temp/lookup.csv"
-	else
-		awk -F, -v setname="$1" '$1 == setname {print $2}' "$dir_system/lookup.csv"
-	fi
+	awk -F, -v setname="$1" '$1 == setname {print $2}' "$dir_system/lookup.csv"
 }
 
 
@@ -454,7 +454,7 @@ load_Whitelist() {
 
 load_Blacklist() {
 	if [ "$option" = "cru" ]; then return; fi
-	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Blacklist')"
+	log_Skynet "[i] Update $(lookup_Update_Comment 'Skynet-Blacklist')"
 	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' > "$dir_temp/ipset"
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" comment
@@ -467,7 +467,7 @@ load_Blacklist() {
 load_Domain() {
 	if [ $((updatecount % 48)) -ne 0 ]; then return; fi
 	local domain= n=0
-	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Domain')"
+	log_Skynet "[i] Update $(lookup_Update_Comment 'Skynet-Domain')"
 	true > "$dir_temp/ipset"
 	for domain in $(echo "$blacklist_domain" | filter_Domain); do
 		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
@@ -485,7 +485,7 @@ load_Domain() {
 load_ASN() {
 	if [ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ]; then return; fi
 	local asn= n=0
-	log_Skynet "[i] Update $(lookup_Comment 'Skynet-ASN')"
+	log_Skynet "[i] Update $(lookup_Update_Comment 'Skynet-ASN')"
 	rm -f "$dir_reload/asn"
 	true > "$dir_temp/ipset"
 	for asn in $(echo "$blacklist_asn" | filter_ASN); do
@@ -802,24 +802,24 @@ case "$command" in
 
 	frequency)
 		header "Blacklist" "Average update frequency"
-		true > "$dir_temp/csv"
+		true > "$dir_temp/file.csv"
 		for setname in $(awk -F, '{print $1}' "$dir_system/lookup.csv" | filter_Skynet_Set); do
 			n=$(head -1 "$dir_update/$setname" 2>/dev/null); if ! [ "$n" -gt 0 ] 2>/dev/null; then n=1; fi
 			sec=$(($(file_Age "$dir_system/installtime") / n))
-			echo "$(lookup_Comment "$setname"),$(formatted_Time "$sec"),$sec" >> "$dir_temp/csv"
+			echo "$(lookup_Comment "$setname"),$(formatted_Time "$sec"),$sec" >> "$dir_temp/file.csv"
 		done
-		sort -t, -k3n < "$dir_temp/csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
+		sort -t, -k3n < "$dir_temp/file.csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
 		footer
 	;;
 
 
 	entries)
 		header "Blacklist" "Number of entries"
-		true > "$dir_temp/csv"
+		true > "$dir_temp/file.csv"
 		for setname in $(awk -F, '{print $1}' "$dir_system/lookup.csv"); do
-			echo "$(lookup_Comment "$setname"),$(ipset -t list "$setname" | grep -F 'Number of entries' | grep -Eo '[0-9]+')" >> "$dir_temp/csv"
+			echo "$(lookup_Comment "$setname"),$(ipset -t list "$setname" | grep -F 'Number of entries' | grep -Eo '[0-9]+')" >> "$dir_temp/file.csv"
 		done
-		sort -t, -k2nr < "$dir_temp/csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
+		sort -t, -k2nr < "$dir_temp/file.csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
 		footer
 	;;
 
@@ -843,11 +843,11 @@ case "$command" in
 
 	*)
 		header "Blacklist" "Packets blocked"
-		true > "$dir_temp/csv"
+		true > "$dir_temp/file.csv"
 		ipset list Skynet-Master | filter_Skynet | awk '{print $1","$3}' | while IFS=',' read -r setname blocked; do
-			echo "$(lookup_Comment "$setname"),$blocked" >> "$dir_temp/csv"
+			echo "$(lookup_Comment "$setname"),$blocked" >> "$dir_temp/file.csv"
 		done
-		sort -t, -k2nr -k1,1 < "$dir_temp/csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
+		sort -t, -k2nr -k1,1 < "$dir_temp/file.csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
 		footer
 	;;
 esac
