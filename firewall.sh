@@ -85,7 +85,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.18b"
+version="1.18c"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -314,20 +314,15 @@ log_Tail() {
 }
 
 
-lookup_Initialize() {
+lookup_Comment_Init() {
 	local comment=$(echo "$blacklist_ip" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_ip"; fi; echo "Skynet-Blacklist,$comment" > "$dir_temp/lookup.csv"
 	comment=$(echo "$blacklist_domain" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_domain"; fi; echo "Skynet-Domain,$comment" >> "$dir_temp/lookup.csv"
 	comment=$(echo "$blacklist_asn" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_asn"; fi; echo "Skynet-ASN,$comment" >> "$dir_temp/lookup.csv"
 }
 
 
-lookup_Update_Comment() {
-	awk -F, -v setname="$1" '$1 == setname {print $2}' "$dir_temp/lookup.csv"
-}
-
-
 lookup_Comment() {
-	awk -F, -v setname="$1" '$1 == setname {print $2}' "$dir_system/lookup.csv"
+	awk -F, -v setname="$1" '$1 == setname {print $2}' "$dir_temp/lookup.csv"
 }
 
 
@@ -454,7 +449,7 @@ load_Whitelist() {
 
 load_Blacklist() {
 	if [ "$option" = "cru" ]; then return; fi
-	log_Skynet "[i] Update $(lookup_Update_Comment 'Skynet-Blacklist')"
+	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Blacklist')"
 	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' > "$dir_temp/ipset"
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" comment
@@ -467,7 +462,7 @@ load_Blacklist() {
 load_Domain() {
 	if [ $((updatecount % 48)) -ne 0 ]; then return; fi
 	local domain= n=0
-	log_Skynet "[i] Update $(lookup_Update_Comment 'Skynet-Domain')"
+	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Domain')"
 	true > "$dir_temp/ipset"
 	for domain in $(echo "$blacklist_domain" | filter_Domain); do
 		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
@@ -485,7 +480,7 @@ load_Domain() {
 load_ASN() {
 	if [ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ]; then return; fi
 	local asn= n=0
-	log_Skynet "[i] Update $(lookup_Update_Comment 'Skynet-ASN')"
+	log_Skynet "[i] Update $(lookup_Comment 'Skynet-ASN')"
 	rm -f "$dir_reload/asn"
 	true > "$dir_temp/ipset"
 	for asn in $(echo "$blacklist_asn" | filter_ASN); do
@@ -655,6 +650,7 @@ if ! flock -n 99; then
 fi
 
 
+cp "$dir_system/lookup.csv" "$dir_temp/lookup.csv"
 unset i execution_time
 
 
@@ -673,9 +669,10 @@ case "$command" in
 		rm -f "$dir_system/"*
 		rm -f "$dir_temp/"*
 		rm -f "$dir_update/"*
-		touch "$dir_skynet/warning.log"
-		touch "$dir_skynet/error.log"
+		true > "$dir_skynet/warning.log"
+		true > "$dir_skynet/error.log"
 		touch "$dir_system/installtime"
+		lookup_Comment_Init
 		if [ "$0" != "/jffs/scripts/firewall" ]; then
 			mv -f "$0" "/jffs/scripts/firewall"
 			log_Skynet "[!] Skynet Lite moved to /jffs/scripts/firewall"
@@ -693,7 +690,6 @@ case "$command" in
 		m3=$((rand + 30)); m4=$((rand + 45))
 		cru d Skynet_update
 		cru a Skynet_update "$m1,$m2,$m3,$m4 * * * * nice -n 19 sh /jffs/scripts/firewall update cru"
-		lookup_Initialize
 		unload_IPTables
 		unload_LogIPTables
 		unload_IPSets
@@ -718,11 +714,11 @@ case "$command" in
 
 	update)
 		header "Update"
+		lookup_Comment_Init
 		if [ -f "$dir_reload/all" ]; then
 			rm -f "$dir_reload/all"
 			updatecount="0"
 		fi
-		lookup_Initialize
 		load_Whitelist
 		load_Blacklist
 		load_Domain
