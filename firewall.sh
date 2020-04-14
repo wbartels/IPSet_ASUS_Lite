@@ -85,7 +85,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.18d"
+version="1.18e"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -749,11 +749,6 @@ case "$command" in
 
 	"$ip")
 		header "Search for $ip"
-		if ipset -q test "Skynet-Whitelist" "$ip"; then
-			echo " [*] $(lookup_Comment 'Skynet-Whitelist')"
-		else
-			echo " [ ] $(lookup_Comment 'Skynet-Whitelist')"
-		fi
 		for setname in $(awk -F, '{print $1}' "$dir_system/lookup.csv"); do
 			if ipset -q test "$setname" "$ip"; then
 				echo " [*] $(lookup_Comment "$setname")"
