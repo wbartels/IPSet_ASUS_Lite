@@ -41,7 +41,7 @@
 #
 # The other lists (ip, domain and asn) can contain multiple items per list.
 # The items on these lists must be separated with a space, tab or newline.
-# blacklist_ip, blacklist_domain and blacklist_asn can optional use one global <comment> tag.
+# blacklist_ip, blacklist_domain, blacklist_asn and whitelist_ip can optional use one <comment> tag per list.
 #
 
 
@@ -85,7 +85,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.18c"
+version="1.18d"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -194,7 +194,7 @@ unload_IPSets() {
 
 
 lookup_Domain() {
-	set -o pipefail; nslookup "$1" 2>/dev/null | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk 'NR>2'
+	set -o pipefail; nslookup "$1" 2>/dev/null | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk 'NR>2'
 	if [ $? -ne 0 ]; then
 		log_Skynet "[*] nslookup can't resolve $1"
 	fi
@@ -202,17 +202,17 @@ lookup_Domain() {
 
 
 strip_Domain() {
-	grep -oE 'https?://\S+' | cut -d'/' -f3 | awk '!x[$0]++'
+	grep -Eo 'https?://\S+' | cut -d'/' -f3 | awk '!x[$0]++'
 }
 
 
 filter_Domain() {
-	awk '{gsub("<.+>", ""); print}' | grep -oE '\b(([a-z](-?[a-z0-9])*)\.)+[a-z]{2,}\b'
+	awk '{gsub("<.+>", ""); print}' | grep -Eo '\b(([a-z](-?[a-z0-9])*)\.)+[a-z]{2,}\b'
 }
 
 
 filter_URL() {
-	grep -oE 'https?://\S+'
+	grep -Eo 'https?://\S+'
 }
 
 
@@ -222,13 +222,13 @@ filter_URL_Line() {
 
 
 filter_IP_CIDR() {
-	grep -oE '\b(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3}(\/(3[0-2]|[1-2][0-9]|[0-9]))?\b'
+	grep -Eo '\b(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3}(\/(3[0-2]|[1-2][0-9]|[0-9]))?\b'
 }
 
 
 filter_PrivateIP() {
 	# https://regex101.com/r/vDjcX3/1
-	grep -vE '^(0\.|10\.|100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.|127\.|169\.254\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[0-1]\.|192\.0\.0\.|192\.0\.2\.|192\.168\.|198\.1[8-9]\.|198\.51\.100\.|203\.0\.113\.|2(2[4-9]|[3-4][0-9]|5[0-5])\.)'
+	grep -Ev '^(0\.|10\.|100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.|127\.|169\.254\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[0-1]\.|192\.0\.0\.|192\.0\.2\.|192\.168\.|198\.1[8-9]\.|198\.51\.100\.|203\.0\.113\.|2(2[4-9]|[3-4][0-9]|5[0-5])\.)'
 }
 
 
@@ -238,27 +238,27 @@ filter_IP_Line() {
 
 
 is_IP() {
-	grep -oE '^(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3}$'
+	grep -Eo '^(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3}$'
 }
 
 
 filter_ASN() {
-	grep -oE 'AS[1-9][0-9]{2,9}'
+	grep -Eo 'AS[1-9][0-9]{2,9}'
 }
 
 
 filter_Comment() {
-	grep -oE '<.+>' | tr -d '<>' | tr ',' ';'
+	grep -Eo '<.+>' | tr -d '<>' | tr ',' ';'
 }
 
 
 filter_Update_Cycles() {
-	grep -oE '\{[0-9]+\}' | tr -d '{}'
+	grep -Eo '\{[1-9][0-9]*\}' | tr -d '{}'
 }
 
 
 filter_Skynet() {
-	grep  -E '^Skynet-'
+	grep -E '^Skynet-'
 }
 
 
@@ -315,7 +315,8 @@ log_Tail() {
 
 
 lookup_Comment_Init() {
-	local comment=$(echo "$blacklist_ip" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_ip"; fi; echo "Skynet-Blacklist,$comment" > "$dir_temp/lookup.csv"
+	local comment=$(echo "$whitelist_ip" | filter_Comment); if [ -z "$comment" ]; then comment="whitelist"; fi; echo "Skynet-Whitelist,$comment" > "$dir_temp/lookup.csv"
+	comment=$(echo "$blacklist_ip" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_ip"; fi; echo "Skynet-Blacklist,$comment" >> "$dir_temp/lookup.csv"
 	comment=$(echo "$blacklist_domain" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_domain"; fi; echo "Skynet-Domain,$comment" >> "$dir_temp/lookup.csv"
 	comment=$(echo "$blacklist_asn" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_asn"; fi; echo "Skynet-ASN,$comment" >> "$dir_temp/lookup.csv"
 }
@@ -385,7 +386,7 @@ footer() {
 load_Whitelist() {
 	if [ $((updatecount % 48)) -ne 0 ]; then return; fi
 	local cache= curl_exit= domain= http_code= n=0 temp= url=
-	log_Skynet "[i] Update whitelist"
+	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Whitelist')"
 	# Whitelist router and reserved IP addresses:
 	echo "add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Whitelist: wan0_ipaddr\"
 		add Skynet-Temp $(nvram get wan0_realip_ip) comment \"Whitelist: wan0_realip_ip\"
@@ -448,7 +449,7 @@ load_Whitelist() {
 
 
 load_Blacklist() {
-	if [ "$option" = "cru" ]; then return; fi
+	if [ $((updatecount % 48)) -ne 0 ]; then return; fi
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Blacklist')"
 	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' > "$dir_temp/ipset"
 	ipset -q destroy "Skynet-Temp"
@@ -749,9 +750,9 @@ case "$command" in
 	"$ip")
 		header "Search for $ip"
 		if ipset -q test "Skynet-Whitelist" "$ip"; then
-			echo " [*] whitelist"
+			echo " [*] $(lookup_Comment 'Skynet-Whitelist')"
 		else
-			echo " [ ] whitelist"
+			echo " [ ] $(lookup_Comment 'Skynet-Whitelist')"
 		fi
 		for setname in $(awk -F, '{print $1}' "$dir_system/lookup.csv"); do
 			if ipset -q test "$setname" "$ip"; then
