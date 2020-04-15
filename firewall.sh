@@ -85,7 +85,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.18g"
+version="1.18h"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -339,7 +339,7 @@ formatted_Time() {
 
 
 formatted_File_Age() {
-	formatted_Time $(file_Age "$1")
+	formatted_Time $(($(date +%s) - $(date +%s -r "$1" 2>/dev/null || echo $start_time)))
 }
 
 
@@ -527,7 +527,7 @@ load_Set() {
 	ipset swap "$setname" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
 	date -R >> "$dir_debug/$comment.log"; log_Tail "$dir_debug/$comment.log"
-	update_Counter "$dir_update/$setname" > /dev/null
+	update_Counter "$dir_update/$setname" >/dev/null
 }
 
 
@@ -788,10 +788,12 @@ case "$command" in
 
 	fresh)
 		header "Blacklist" "Client file age"
-		cd "$dir_update"
-		for setname in $(ls -1t | filter_Skynet_Set); do
-			printf " %-40s  %15s\n" "$(lookup_Comment "$setname")" "$(formatted_File_Age "$dir_update/$setname")"
+		true > "$dir_temp/file.csv"
+		filter_Skynet_Set < "$dir_system/lookup.csv" | while IFS=, read -r setname comment; do
+			age=$(file_Age "$dir_update/$setname")
+			echo "$comment,$(formatted_Time "$age"),$age" >> "$dir_temp/file.csv"
 		done
+		sort -t, -k3n < "$dir_temp/file.csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
 		footer
 	;;
 
