@@ -53,6 +53,7 @@
 filtertraffic="all"		# inbound | outbound | all
 logmode="enabled"		# enabled | disabled
 loginvalid="disabled"	# enabled | disabled
+debugupdate="disabled"	# enabled | disabled
 
 
 blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {4}
@@ -85,21 +86,19 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.20b"
+version="1.20c"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
 dir_skynet="/tmp/skynet"
-dir_cache1="$dir_skynet/cache1"
-dir_cache2="$dir_skynet/cache2"
-dir_debug="$dir_skynet/debug"
+dir_cache="$dir_skynet/cache"
 dir_reload="$dir_skynet/reload"
 dir_sleep="$dir_skynet/sleep"
 dir_system="$dir_skynet/system"
 dir_temp="$dir_skynet/temp"
 dir_update="$dir_skynet/update"
-mkdir -p "$dir_cache1" "$dir_cache2" "$dir_debug" "$dir_reload"
-mkdir -p "$dir_sleep" "$dir_system" "$dir_temp" "$dir_update"
+mkdir -p "$dir_cache" "$dir_reload" "$dir_sleep"
+mkdir -p "$dir_system" "$dir_temp" "$dir_update"
 
 
 if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
@@ -432,7 +431,7 @@ load_Whitelist() {
 	# Whitelist root hints:
 	url="http://www.internic.net/domain/named.root"
 	temp="$dir_temp/named.root"; touch "$temp"
-	cache="$dir_cache2/named.root"
+	cache="$dir_cache/named.root"
 	if http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache") && [ "$http_code" = "200" ]; then
 		mv -f "$temp" "$cache"
 	fi
@@ -527,8 +526,8 @@ load_Set() {
 	ipset restore -! -f "$dir_temp/ipset"
 	ipset swap "$setname" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
-	date -R >> "$dir_debug/$comment.log"; log_Tail "$dir_debug/$comment.log"
 	update_Counter "$dir_update/$setname" >/dev/null
+	if [ "$debugupdate" = "enabled" ]; then mkdir -p "$dir_skynet/debug"; date -R >> "$dir_skynet/debug/$comment.log"; log_Tail "$dir_skynet/debug/$comment.log"; fi
 }
 
 
@@ -564,7 +563,7 @@ download_Set() {
 
 		rm -f "$dir_sleep/$setname"
 		temp="$dir_temp/$setname"; touch "$temp"
-		cache="$dir_cache1/$setname"
+		cache="$dir_cache/$setname"
 		http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
 		if [ $curl_exit -eq 0 ]; then
 			if [ "$http_code" = "304" ] && ! ipset -n list "$setname" >/dev/null 2>&1; then
@@ -602,8 +601,8 @@ download_Set() {
 		fi
 	done
 
-	# Cleanup cache, reload and update directory
-	for dir in "$dir_cache1" "$dir_reload" "$dir_update"; do
+	# Cleanup directories
+	for dir in "$dir_cache" "$dir_reload" "$dir_sleep" "$dir_update"; do
 		cd "$dir"
 		for setname in $(ls -1t | filter_Skynet_Set); do
 			if ! echo "$list" | grep -q "$setname"; then
@@ -676,7 +675,6 @@ case "$command" in
 	reset)
 		header "Reset"
 		log_Skynet "[i] Install"
-		rm -f "$dir_debug/"*
 		rm -f "$dir_reload/"*
 		rm -f "$dir_sleep/"*
 		rm -f "$dir_system/"*
