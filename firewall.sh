@@ -85,7 +85,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.18h"
+version="1.20"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -94,11 +94,12 @@ dir_cache1="$dir_skynet/cache1"
 dir_cache2="$dir_skynet/cache2"
 dir_debug="$dir_skynet/debug"
 dir_reload="$dir_skynet/reload"
+dir_sleep="$dir_skynet/sleep"
 dir_system="$dir_skynet/system"
 dir_temp="$dir_skynet/temp"
 dir_update="$dir_skynet/update"
 mkdir -p "$dir_cache1" "$dir_cache2" "$dir_debug" "$dir_reload"
-mkdir -p "$dir_system" "$dir_temp" "$dir_update"
+mkdir -p "$dir_sleep" "$dir_system" "$dir_temp" "$dir_update"
 
 
 if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
@@ -553,10 +554,15 @@ download_Set() {
 			update_cycles=1
 			rm -f "$dir_reload/$setname"
 		fi
+		if [ -f "$dir_sleep/$setname" ] && [ $(file_Age "$dir_sleep/$setname") -le 14400 ]; then
+			log_Skynet "[!] Sleep $comment"
+			continue
+		fi
 		if [ $((updatecount % update_cycles)) -ne 0 ]; then
 			continue
 		fi
 
+		rm -f "$dir_sleep/$setname"
 		temp="$dir_temp/$setname"; touch "$temp"
 		cache="$dir_cache1/$setname"
 		http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
@@ -576,6 +582,10 @@ download_Set() {
 				mv -f "$temp" "$cache"
 				load_Set
 			fi
+		elif [ "$http_code" = "429" ]; then
+			log_Skynet "[*] Download error HTTP/429 Too many requests $url"
+			touch "$dir_sleep/$setname"
+			rm -f "$dir_reload/$setname"
 		else
 			log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $curl_exit) $url"
 			touch "$dir_reload/$setname"
@@ -671,6 +681,7 @@ case "$command" in
 		log_Skynet "[i] Install"
 		rm -f "$dir_debug/"*
 		rm -f "$dir_reload/"*
+		rm -f "$dir_sleep/"*
 		rm -f "$dir_system/"*
 		rm -f "$dir_temp/"*
 		rm -f "$dir_update/"*
