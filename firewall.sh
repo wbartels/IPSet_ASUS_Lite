@@ -85,7 +85,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.20"
+version="1.20b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -554,8 +554,8 @@ download_Set() {
 			update_cycles=1
 			rm -f "$dir_reload/$setname"
 		fi
-		if [ -f "$dir_sleep/$setname" ] && [ $(file_Age "$dir_sleep/$setname") -le 14400 ]; then
-			log_Skynet "[!] Sleep $comment"
+		if [ -f "$dir_sleep/$setname" ] && [ $(file_Age "$dir_sleep/$setname") -lt 14400 ]; then
+			log_Skynet "[!] Sleep $(formatted_Time $((14400 - $(file_Age "$dir_sleep/$setname")))) $comment"
 			continue
 		fi
 		if [ $((updatecount % update_cycles)) -ne 0 ]; then
@@ -585,7 +585,6 @@ download_Set() {
 		elif [ "$http_code" = "429" ]; then
 			log_Skynet "[*] Download error HTTP/429 Too many requests $url"
 			touch "$dir_sleep/$setname"
-			rm -f "$dir_reload/$setname"
 		else
 			log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $curl_exit) $url"
 			touch "$dir_reload/$setname"
@@ -625,7 +624,6 @@ while [ "$(nvram get ntp_ready)" = "0" ]; do
 	if [ $i -eq 0 ]; then log_Skynet "[i] Waiting for NTP to sync..."; fi
 	if [ $i -eq 300 ]; then
 		log_Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!"
-		touch "$dir_reload/all"
 		echo; exit 1;
 	fi
 	i=$((i + 1)); sleep 1
@@ -641,7 +639,6 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 		if [ $i -eq 1 ]; then log_Skynet "[!] Waiting for internet connectivity..."; fi
 		if [ $i -eq 6 ]; then
 			log_Skynet "[*] Internet connectivity error"
-			touch "$dir_reload/all"
 			echo; exit 1
 		fi
 		sleep 9
@@ -731,10 +728,6 @@ case "$command" in
 	update)
 		header "Update"
 		lookup_Comment_Init
-		if [ -f "$dir_reload/all" ]; then
-			rm -f "$dir_reload/all"
-			updatecount="0"
-		fi
 		load_Whitelist
 		load_Blacklist
 		load_Domain
