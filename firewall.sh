@@ -86,7 +86,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.20c"
+version="1.20d"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -553,15 +553,15 @@ download_Set() {
 			update_cycles=1
 			rm -f "$dir_reload/$setname"
 		fi
+		if [ $((updatecount % update_cycles)) -ne 0 ]; then
+			continue
+		fi
 		if [ -f "$dir_sleep/$setname" ] && [ $(file_Age "$dir_sleep/$setname") -lt 14400 ]; then
 			log_Skynet "[!] Sleep $(formatted_Time $((14400 - $(file_Age "$dir_sleep/$setname")))) $comment"
 			continue
 		fi
-		if [ $((updatecount % update_cycles)) -ne 0 ]; then
-			continue
-		fi
-
 		rm -f "$dir_sleep/$setname"
+
 		temp="$dir_temp/$setname"; touch "$temp"
 		cache="$dir_cache/$setname"
 		http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
