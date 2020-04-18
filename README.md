@@ -45,7 +45,7 @@ firewall uninstall
 firewall help
 ```
 
-To make the commands above available form all directories, type the following line in your favorite SSH Client:
+To make the commands above available from all directories, type the following line in your favorite SSH Client:
 
 ```Shell
 echo 'export PATH=$PATH:/jffs/scripts' >> '/jffs/configs/profile.add'
