@@ -15,7 +15,7 @@ Ensure you have an [Asuswrt-Merlin](https://www.asuswrt-merlin.net/) firmware an
 Administration > System > Enable JFFS custom scripts and configs: Yes > Apply
 ```
 
-In your favorite SSH Client:
+Type the following line in your favorite SSH Client:
 
 ```Shell
 curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && sh /jffs/scripts/firewall
@@ -23,7 +23,7 @@ curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.
 
 ## Uninstall
 
-In your favorite SSH Client:
+Type the following line in your favorite SSH Client:
 
 ```Shell
 sh /jffs/scripts/firewall uninstall
@@ -31,7 +31,7 @@ sh /jffs/scripts/firewall uninstall
 
 ## Commands
 
-```Shell
+```
 firewall
 firewall 1.1.1.1
 firewall fresh
@@ -43,6 +43,12 @@ firewall update
 firewall reset
 firewall uninstall
 firewall help
+```
+
+To make the commands above available form all directories, type the following line in your favorite SSH Client:
+
+```Shell
+echo 'export PATH=$PATH:/jffs/scripts' >> '/jffs/configs/profile.add'
 ```
 
 ### Donate to Skynet by Adamm
