@@ -53,7 +53,7 @@
 filtertraffic="all"		# inbound | outbound | all
 logmode="enabled"		# enabled | disabled
 loginvalid="disabled"	# enabled | disabled
-debugupdate="enabled"	# enabled | disabled
+debugupdate="disabled"	# enabled | disabled
 
 
 blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {4}
