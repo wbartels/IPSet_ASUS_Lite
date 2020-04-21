@@ -53,18 +53,19 @@
 filtertraffic="all"		# inbound | outbound | all
 logmode="enabled"		# enabled | disabled
 loginvalid="disabled"	# enabled | disabled
-debugupdate="disabled"	# enabled | disabled
+debugupdate="enabled"	# enabled | disabled
 
 
 blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {4}
-					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {1}
+					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {4}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
 					<blocklist_net_ua>				https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
-					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
+					<ciarmy>						http://cinsscore.com/list/ci-badguys.txt  {1}
+					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
 					<maxmind_high_risk>				https://www.maxmind.com/en/high-risk-ip-sample-list  {16}
-					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
+					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
 					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {16}
 					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {16}
 					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
@@ -86,18 +87,19 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.20d"
+version="1.21"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
 dir_skynet="/tmp/skynet"
 dir_cache="$dir_skynet/cache"
+dir_debug="$dir_skynet/debug"
 dir_reload="$dir_skynet/reload"
 dir_sleep="$dir_skynet/sleep"
 dir_system="$dir_skynet/system"
 dir_temp="$dir_skynet/temp"
 dir_update="$dir_skynet/update"
-mkdir -p "$dir_cache" "$dir_reload" "$dir_sleep"
+mkdir -p "$dir_cache" "$dir_debug" "$dir_reload" "$dir_sleep"
 mkdir -p "$dir_system" "$dir_temp" "$dir_update"
 
 
@@ -273,9 +275,9 @@ curl_Error() {
 		2)  echo -n "Failed initialization" ;;
 		3)  echo -n "URL malformat" ;;
 		4)  echo -n "Not built in" ;;
-		5)  echo -n "Can't resolve proxy" ;;
-		6)  echo -n "Can't resolve host" ;;
-		7)  echo -n "Can't connect" ;;
+		5)  echo -n "Couldn't resolve proxy" ;;
+		6)  echo -n "Couldn't resolve host" ;;
+		7)  echo -n "Couldn't connect" ;;
 		8)  echo -n "Weird server reply" ;;
 		9)  echo -n "Remote access denied" ;;
 		18) echo -n "Partial file" ;;
@@ -291,6 +293,7 @@ curl_Error() {
 		52) echo -n "Empty reply from server" ;;
 		55) echo -n "Send error" ;;
 		56) echo -n "Receive error" ;;
+		60) echo -n "Peer failed verification" ;;
 		61) echo -n "Bad content encoding" ;;
 		*)  echo -n "Error $1 returned by curl" ;;
 	esac
@@ -301,8 +304,8 @@ log_Skynet() {
 	logger -t skynet "$1"
 	echo " $1" >&2
 	local type="$(echo "$1" | cut -c1-3)"
-	if [ "$type" = "[!]" ]; then echo "$(date -R) | $(echo "$1" | cut -c5-)" >> "$dir_skynet/warning.log"; fi
-	if [ "$type" = "[*]" ]; then echo "$(date -R) | $(echo "$1" | cut -c5-)" >> "$dir_skynet/error.log"; fi
+	if [ "$type" = "[!]" ]; then echo "$(date '+%b %d %T') | $(echo "$1" | cut -c5-)" >> "$dir_skynet/warning.log"; fi
+	if [ "$type" = "[*]" ]; then echo "$(date '+%b %d %T') | $(echo "$1" | cut -c5-)" >> "$dir_skynet/error.log"; fi
 }
 
 
@@ -516,7 +519,7 @@ load_ASN() {
 
 load_Set() {
 	log_Skynet "[i] Update $comment"
-	filter_IP_CIDR < "$cache" | filter_PrivateIP | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' > "$dir_temp/ipset"
+	filter_IP_CIDR < "$temp" | filter_PrivateIP | awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' > "$dir_temp/ipset"
 	if ! ipset list -n "$setname" >/dev/null 2>&1; then
 		ipset create "$setname" hash:net hashsize 64 maxelem 262144 comment
 		ipset add Skynet-Master "$setname" comment "$comment"
@@ -527,7 +530,19 @@ load_Set() {
 	ipset swap "$setname" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
 	update_Counter "$dir_update/$setname" >/dev/null
-	if [ "$debugupdate" = "enabled" ]; then mkdir -p "$dir_skynet/debug"; date -R >> "$dir_skynet/debug/$comment.log"; log_Tail "$dir_skynet/debug/$comment.log"; fi
+	if [ "$debugupdate" = "enabled" ]; then
+		if [ -f "$cache" ]; then
+			filter_IP_CIDR < "$temp" | filter_PrivateIP | awk '!x[$0]++' | sort > "$dir_temp/filtered_temp_set"
+			filter_IP_CIDR < "$cache" | filter_PrivateIP | awk '!x[$0]++' | sort > "$dir_temp/filtered_cache_set"
+			local deleted_entries=$(diff "$dir_temp/filtered_temp_set" "$dir_temp/filtered_cache_set" | grep -E '^-[1-9]' | wc -l)
+			local added_entries=$(diff "$dir_temp/filtered_temp_set" "$dir_temp/filtered_cache_set" | grep -E '^\+[1-9]' | wc -l)
+		else
+			local deleted_entries="0"
+			local added_entries=$(filter_IP_CIDR < "$temp" | filter_PrivateIP | awk '!x[$0]++' | wc -l)
+		fi
+		printf "$(date '+%b %d %T') | %7s | %7s |\n" "-$deleted_entries" "+$added_entries" >> "$dir_debug/$comment.log";
+		log_Tail "$dir_debug/$comment.log";
+	fi
 }
 
 
@@ -566,10 +581,7 @@ download_Set() {
 		cache="$dir_cache/$setname"
 		http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
 		if [ $curl_exit -eq 0 ]; then
-			if [ "$http_code" = "304" ] && ! ipset -n list "$setname" >/dev/null 2>&1; then
-				# 304 Not Modified and not in ipset
-				load_Set
-			elif [ "$http_code" = "304" ]; then
+			if [ "$http_code" = "304" ]; then
 				# 304 Not Modified
 				log_Skynet "[i] Fresh $comment"
 			elif [ -f "$cache" ] && cmp -s "$temp" "$cache" && ipset -n list "$setname" >/dev/null 2>&1; then
@@ -578,8 +590,8 @@ download_Set() {
 				mv -f "$temp" "$cache"
 			else
 				# 200 OK
+				load_Set # uses temp
 				mv -f "$temp" "$cache"
-				load_Set
 			fi
 		elif [ "$http_code" = "429" ]; then
 			log_Skynet "[*] Download error HTTP/429 Too many requests $url"
@@ -675,6 +687,8 @@ case "$command" in
 	reset)
 		header "Reset"
 		log_Skynet "[i] Install"
+		rm -f "$dir_cache/"*
+		rm -f "$dir_debug/"*
 		rm -f "$dir_reload/"*
 		rm -f "$dir_sleep/"*
 		rm -f "$dir_system/"*
