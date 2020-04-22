@@ -87,7 +87,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.21"
+version="1.22"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -351,6 +351,14 @@ file_Age() {
 }
 
 
+compare_IP_List() {
+	filter_IP_CIDR < "$1" | filter_PrivateIP | awk '!x[$0]++' | sort > "$dir_temp/filtered_set_1"
+	filter_IP_CIDR < "$2" | filter_PrivateIP | awk '!x[$0]++' | sort > "$dir_temp/filtered_set_2"
+	cmp -s "$dir_temp/filtered_set_1" "$dir_temp/filtered_set_2"
+	return $?
+}
+
+
 update_Counter() {
 	n=$(head -1 "$1" 2>/dev/null)
 	n=$((n + 1))
@@ -532,10 +540,8 @@ load_Set() {
 	update_Counter "$dir_update/$setname" >/dev/null
 	if [ "$debugupdate" = "enabled" ]; then
 		if [ -f "$cache" ]; then
-			filter_IP_CIDR < "$temp" | filter_PrivateIP | awk '!x[$0]++' | sort > "$dir_temp/filtered_temp_set"
-			filter_IP_CIDR < "$cache" | filter_PrivateIP | awk '!x[$0]++' | sort > "$dir_temp/filtered_cache_set"
-			local deleted_entries=$(diff "$dir_temp/filtered_temp_set" "$dir_temp/filtered_cache_set" | grep -E '^-[1-9]' | wc -l)
-			local added_entries=$(diff "$dir_temp/filtered_temp_set" "$dir_temp/filtered_cache_set" | grep -E '^\+[1-9]' | wc -l)
+			local deleted_entries=$(diff "$dir_temp/filtered_set_1" "$dir_temp/filtered_set_2" | grep -E '^-[1-9]' | wc -l)
+			local added_entries=$(diff "$dir_temp/filtered_set_1" "$dir_temp/filtered_set_2" | grep -E '^\+[1-9]' | wc -l)
 		else
 			local deleted_entries="0"
 			local added_entries=$(filter_IP_CIDR < "$temp" | filter_PrivateIP | awk '!x[$0]++' | wc -l)
@@ -584,13 +590,13 @@ download_Set() {
 			if [ "$http_code" = "304" ]; then
 				# 304 Not Modified
 				log_Skynet "[i] Fresh $comment"
-			elif [ -f "$cache" ] && cmp -s "$temp" "$cache" && ipset -n list "$setname" >/dev/null 2>&1; then
-				# Likely unsupported: If-Modified-Since / 304 Not Modified
+			elif [ -f "$cache" ] && compare_IP_List "$temp" "$cache" && ipset -n list "$setname" >/dev/null 2>&1; then
+				# 200 OK; Redownload identical filtered content / Unsupported If-Modified-Since
 				log_Skynet "[!] Redownload $comment"
 				mv -f "$temp" "$cache"
 			else
 				# 200 OK
-				load_Set # uses temp
+				load_Set
 				mv -f "$temp" "$cache"
 			fi
 		elif [ "$http_code" = "429" ]; then
