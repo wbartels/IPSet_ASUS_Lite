@@ -87,7 +87,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.22"
+version="1.22b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -352,8 +352,8 @@ file_Age() {
 
 
 compare_IP_List() {
-	filter_IP_CIDR < "$1" | filter_PrivateIP | awk '!x[$0]++' | sort > "$dir_temp/filtered_set_1"
-	filter_IP_CIDR < "$2" | filter_PrivateIP | awk '!x[$0]++' | sort > "$dir_temp/filtered_set_2"
+	filter_IP_CIDR < "$1" | filter_PrivateIP | sort -u > "$dir_temp/filtered_set_1"
+	filter_IP_CIDR < "$2" | filter_PrivateIP | sort -u > "$dir_temp/filtered_set_2"
 	cmp -s "$dir_temp/filtered_set_1" "$dir_temp/filtered_set_2"
 	return $?
 }
