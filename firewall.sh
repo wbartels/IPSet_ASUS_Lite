@@ -87,7 +87,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.22c"
+version="1.22d"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -351,6 +351,12 @@ file_Age() {
 }
 
 
+firewall_Unmodified() {
+	if [ "$1" = "timestamp" ]; then date +%s -r '/jffs/scripts/firewall' > "$dir_system/firewall_timestamp"; return; fi
+	[ "$(date +%s -r '/jffs/scripts/firewall')" = "$(head -1 "$dir_system/firewall_timestamp" 2>/dev/null)" ]
+}
+
+
 compare_Set() {
 	filter_IP_CIDR < "$1" | filter_PrivateIP | sort -u > "$dir_temp/filtered_set_1"
 	filter_IP_CIDR < "$2" | filter_PrivateIP | sort -u > "$dir_temp/filtered_set_2"
@@ -459,7 +465,7 @@ load_Whitelist() {
 
 
 load_Blacklist() {
-	if [ $((updatecount % 48)) -ne 0 ]; then return; fi
+	if firewall_Unmodified; then return; fi
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Blacklist')"
 	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' > "$dir_temp/ipset"
 	ipset -q destroy "Skynet-Temp"
@@ -565,7 +571,6 @@ download_Set() {
 			comment=$(filter_Comment "<$(basename "$url")>")
 		fi
 		echo "$setname,$comment" >> "$dir_temp/lookup.csv"
-
 		if [ -z "$update_cycles" ]; then
 			update_cycles=4
 		fi
@@ -587,14 +592,11 @@ download_Set() {
 		http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
 		if [ $curl_exit -eq 0 ]; then
 			if [ "$http_code" = "304" ]; then
-				# 304 Not Modified
 				log_Skynet "[i] Fresh $comment"
 			elif [ -f "$cache" ] && compare_Set "$temp" "$cache" && ipset -n list "$setname" >/dev/null 2>&1; then
-				# 200 OK; Redownload identical filtered content / Unsupported If-Modified-Since
 				log_Skynet "[!] Redownload $comment"
 				mv -f "$temp" "$cache"
 			else
-				# 200 OK
 				load_Set
 				mv -f "$temp" "$cache"
 			fi
@@ -608,6 +610,8 @@ download_Set() {
 		rm -f "$temp"
 	done < "$dir_temp/blacklist_set"
 	sort -t, -k2 < "$dir_temp/lookup.csv" > "$dir_system/lookup.csv"
+
+	if firewall_Unmodified; then return; fi
 
 	# Unload unlisted sets
 	list=$(awk -F, '{print $1}' "$dir_system/lookup.csv" | filter_Skynet_Set)
@@ -873,7 +877,8 @@ esac
 
 
 if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
+	rm -f "$dir_temp/"*
 	log_Tail "$dir_skynet/warning.log"
 	log_Tail "$dir_skynet/error.log"
-	rm -f "$dir_temp/"*
+	firewall_Unmodified "timestamp"
 fi
