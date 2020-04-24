@@ -60,7 +60,6 @@ blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/rep
 					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {4}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
 					<blocklist_net_ua>				https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
-					<ciarmy>						http://cinsscore.com/list/ci-badguys.txt  {1}
 					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
@@ -87,7 +86,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.22d"
+version="1.22e"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
