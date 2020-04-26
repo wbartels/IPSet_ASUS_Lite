@@ -56,10 +56,9 @@ loginvalid="disabled"	# enabled | disabled
 debugupdate="disabled"	# enabled | disabled
 
 
-blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {4}
-					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {4}
+blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {4}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
-					<blocklist_net_ua>				https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
+					<ciarmy>						http://cinsscore.com/list/ci-badguys.txt  {4}
 					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
@@ -86,7 +85,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.22f"
+version="1.22g"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -356,18 +355,6 @@ firewall_Unmodified() {
 }
 
 
-compare_Set() {
-	if [ -f "$2" ]; then
-		filter_IP_CIDR < "$1" | filter_PrivateIP | sort -u > "$dir_temp/filtered_set_temp"
-		filter_IP_CIDR < "$2" | filter_PrivateIP | sort -u > "$dir_temp/filtered_set_cache"
-	else
-		filter_IP_CIDR < "$1" | filter_PrivateIP | sort -u > "$dir_temp/filtered_set_temp"
-		touch "$dir_temp/filtered_set_cache"
-	fi
-	cmp -s "$dir_temp/filtered_set_temp" "$dir_temp/filtered_set_cache"
-}
-
-
 update_Counter() {
 	local n=$(head -1 "$1" 2>/dev/null)
 	n=$((n + 1))
@@ -536,7 +523,7 @@ load_ASN() {
 
 load_Set() {
 	log_Skynet "[i] Update $comment"
-	awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' "$dir_temp/filtered_set_temp" > "$dir_temp/ipset"
+	awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' "$dir_temp/filtered_temp" > "$dir_temp/ipset"
 	if ! ipset list -n "$setname" >/dev/null 2>&1; then
 		ipset create "$setname" hash:net hashsize 64 maxelem 262144 comment
 		ipset add Skynet-Master "$setname" comment "$comment"
@@ -548,11 +535,23 @@ load_Set() {
 	ipset destroy "Skynet-Temp"
 	update_Counter "$dir_update/$setname" >/dev/null
 	if [ "$debugupdate" = "enabled" ]; then
-		local deleted=$(diff "$dir_temp/filtered_set_cache" "$dir_temp/filtered_set_temp" | grep -E '^-[1-9]' | wc -l)
-		local added=$(diff "$dir_temp/filtered_set_cache" "$dir_temp/filtered_set_temp" | grep -E '^\+[1-9]' | wc -l)
+		local deleted=$(diff "$dir_temp/filtered_cache" "$dir_temp/filtered_temp" | grep -E '^-[1-9]' | wc -l)
+		local added=$(diff "$dir_temp/filtered_cache" "$dir_temp/filtered_temp" | grep -E '^\+[1-9]' | wc -l)
 		printf "$(date '+%b %d %T') | %7s | %7s |\n" "-$deleted" "+$added" >> "$dir_debug/$comment.log";
 		log_Tail "$dir_debug/$comment.log";
 	fi
+}
+
+
+compare_Set() {
+	if [ -f "$cache" ]; then
+		filter_IP_CIDR < "$temp" | filter_PrivateIP | sort -u > "$dir_temp/filtered_temp"
+		filter_IP_CIDR < "$cache" | filter_PrivateIP | sort -u > "$dir_temp/filtered_cache"
+	else
+		filter_IP_CIDR < "$temp" | filter_PrivateIP | sort -u > "$dir_temp/filtered_temp"
+		true > "$dir_temp/filtered_cache"
+	fi
+	cmp -s "$dir_temp/filtered_temp" "$dir_temp/filtered_cache"
 }
 
 
@@ -592,7 +591,7 @@ download_Set() {
 		if [ $curl_exit -eq 0 ]; then
 			if [ "$http_code" = "304" ]; then
 				log_Skynet "[i] Fresh $comment"
-			elif compare_Set "$temp" "$cache" && ipset -n list "$setname" >/dev/null 2>&1; then
+			elif compare_Set && ipset -n list "$setname" >/dev/null 2>&1; then
 				log_Skynet "[!] Redownload $comment"
 				mv -f "$temp" "$cache"
 			else
