@@ -53,7 +53,7 @@
 filtertraffic="all"		# inbound | outbound | all
 logmode="enabled"		# enabled | disabled
 loginvalid="disabled"	# enabled | disabled
-debugupdate="disabled"	# enabled | disabled
+debugupdate="enabled"	# enabled | disabled
 
 
 blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {4}
@@ -85,20 +85,21 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.22g"
+version="1.22h"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
 dir_skynet="/tmp/skynet"
 dir_cache="$dir_skynet/cache"
 dir_debug="$dir_skynet/debug"
+dir_filtered="$dir_skynet/filtered"
 dir_reload="$dir_skynet/reload"
 dir_sleep="$dir_skynet/sleep"
 dir_system="$dir_skynet/system"
 dir_temp="$dir_skynet/temp"
 dir_update="$dir_skynet/update"
-mkdir -p "$dir_cache" "$dir_debug" "$dir_reload" "$dir_sleep"
-mkdir -p "$dir_system" "$dir_temp" "$dir_update"
+mkdir -p "$dir_cache" "$dir_debug" "$dir_filtered" "$dir_reload"
+mkdir -p "$dir_sleep" "$dir_system" "$dir_temp" "$dir_update"
 
 
 if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
@@ -523,7 +524,7 @@ load_ASN() {
 
 load_Set() {
 	log_Skynet "[i] Update $comment"
-	awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' "$dir_temp/filtered_temp" > "$dir_temp/ipset"
+	awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' "$filtered_temp" > "$dir_temp/ipset"
 	if ! ipset list -n "$setname" >/dev/null 2>&1; then
 		ipset create "$setname" hash:net hashsize 64 maxelem 262144 comment
 		ipset add Skynet-Master "$setname" comment "$comment"
@@ -535,28 +536,25 @@ load_Set() {
 	ipset destroy "Skynet-Temp"
 	update_Counter "$dir_update/$setname" >/dev/null
 	if [ "$debugupdate" = "enabled" ]; then
-		local deleted=$(diff "$dir_temp/filtered_cache" "$dir_temp/filtered_temp" | grep -E '^-[1-9]' | wc -l)
-		local added=$(diff "$dir_temp/filtered_cache" "$dir_temp/filtered_temp" | grep -E '^\+[1-9]' | wc -l)
-		printf "$(date '+%b %d %T') | %7s | %7s |\n" "-$deleted" "+$added" >> "$dir_debug/$comment.log";
+		printf "$(date '+%b %d %T') | %7s | %7s |\n" \
+			"-$(diff "$filtered_cache" "$filtered_temp" | grep -E '^-[1-9]' | wc -l)" \
+			"+$(diff "$filtered_cache" "$filtered_temp" | grep -E '^\+[1-9]' | wc -l)" >> "$dir_debug/$comment.log";
 		log_Tail "$dir_debug/$comment.log";
 	fi
 }
 
 
 compare_Set() {
-	if [ -f "$cache" ]; then
-		filter_IP_CIDR < "$temp" | filter_PrivateIP | sort -u > "$dir_temp/filtered_temp"
-		filter_IP_CIDR < "$cache" | filter_PrivateIP | sort -u > "$dir_temp/filtered_cache"
-	else
-		filter_IP_CIDR < "$temp" | filter_PrivateIP | sort -u > "$dir_temp/filtered_temp"
-		true > "$dir_temp/filtered_cache"
+	filter_IP_CIDR < "$temp" | filter_PrivateIP | sort -u > "$filtered_temp"
+	if [ ! -f "$filtered_cache" ]; then
+		touch "$filtered_cache"
 	fi
-	cmp -s "$dir_temp/filtered_temp" "$dir_temp/filtered_cache"
+	cmp -s "$filtered_temp" "$filtered_cache"
 }
 
 
 download_Set() {
-	local cache= comment= curl_exit= dir= http_code= line= list= lookup= setname= temp= update_cycles= url=
+	local cache= comment= curl_exit= dir= filtered_cache= filtered_temp= http_code= line= list= lookup= setname= temp= update_cycles= url=
 	echo "$blacklist_set" | filter_URL_Line > "$dir_temp/blacklist_set"
 
 	while IFS= read -r line; do
@@ -585,8 +583,10 @@ download_Set() {
 		fi
 		rm -f "$dir_sleep/$setname"
 
-		temp="$dir_temp/$setname"; touch "$temp"
+		temp="$dir_temp/${setname}_unfiltered"; touch "$temp"
 		cache="$dir_cache/$setname"
+		filtered_temp="$dir_temp/${setname}_filtered"
+		filtered_cache="$dir_filtered/$setname"
 		http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
 		if [ $curl_exit -eq 0 ]; then
 			if [ "$http_code" = "304" ]; then
@@ -597,6 +597,7 @@ download_Set() {
 			else
 				load_Set
 				mv -f "$temp" "$cache"
+				mv -f "$filtered_temp" "$filtered_cache"
 			fi
 		elif [ "$http_code" = "429" ]; then
 			log_Skynet "[*] Download error HTTP/429 Too many requests $url"
@@ -605,7 +606,7 @@ download_Set() {
 			log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $curl_exit) $url"
 			touch "$dir_reload/$setname"
 		fi
-		rm -f "$temp"
+		rm -f "$temp" "$filtered_temp"
 	done < "$dir_temp/blacklist_set"
 	sort -t, -k2 < "$dir_temp/lookup.csv" > "$dir_system/lookup.csv"
 
@@ -694,13 +695,8 @@ case "$command" in
 	reset)
 		header "Reset"
 		log_Skynet "[i] Install"
-		rm -f "$dir_cache/"*
-		rm -f "$dir_debug/"*
-		rm -f "$dir_reload/"*
-		rm -f "$dir_sleep/"*
-		rm -f "$dir_system/"*
-		rm -f "$dir_temp/"*
-		rm -f "$dir_update/"*
+		rm -f "$dir_cache/"* "$dir_debug/"* "$dir_filtered/"* "$dir_reload/"*
+		rm -f "$dir_sleep/"* "$dir_system/"* "$dir_temp/"* "$dir_update/"*
 		true > "$dir_skynet/warning.log"
 		true > "$dir_skynet/error.log"
 		touch "$dir_system/installtime"
