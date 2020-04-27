@@ -56,9 +56,10 @@ loginvalid="disabled"	# enabled | disabled
 debugupdate="enabled"	# enabled | disabled
 
 
-blacklist_set="		<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {4}
+blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {4}
+					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {4}
 					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
-					<ciarmy>						http://cinsscore.com/list/ci-badguys.txt  {4}
+					<blocklist_net_ua>				https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
 					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
 					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
@@ -85,7 +86,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.22h"
+version="1.22i"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -350,7 +351,7 @@ file_Age() {
 }
 
 
-firewall_Unmodified() {
+script_Unmodified() {
 	if [ "$1" = "timestamp" ]; then date +%s -r '/jffs/scripts/firewall' > "$dir_system/firewall_timestamp"; return; fi
 	[ "$(date +%s -r '/jffs/scripts/firewall')" = "$(head -1 "$dir_system/firewall_timestamp" 2>/dev/null)" ]
 }
@@ -457,7 +458,7 @@ load_Whitelist() {
 
 
 load_Blacklist() {
-	if firewall_Unmodified; then return; fi
+	if script_Unmodified; then return; fi
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Blacklist')"
 	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' > "$dir_temp/ipset"
 	ipset -q destroy "Skynet-Temp"
@@ -610,7 +611,7 @@ download_Set() {
 	done < "$dir_temp/blacklist_set"
 	sort -t, -k2 < "$dir_temp/lookup.csv" > "$dir_system/lookup.csv"
 
-	if firewall_Unmodified; then return; fi
+	if script_Unmodified; then return; fi
 
 	# Unload unlisted sets
 	list=$(awk -F, '{print $1}' "$dir_system/lookup.csv" | filter_Skynet_Set)
@@ -622,7 +623,7 @@ download_Set() {
 	done
 
 	# Cleanup directories
-	for dir in "$dir_cache" "$dir_reload" "$dir_sleep" "$dir_update"; do
+	for dir in "$dir_cache" "$dir_filtered" "$dir_reload" "$dir_sleep" "$dir_update"; do
 		cd "$dir"
 		for setname in $(ls -1t | filter_Skynet_Set); do
 			if ! echo "$list" | grep -q "$setname"; then
@@ -714,10 +715,8 @@ case "$command" in
 			echo "sh /jffs/scripts/firewall" >> "/jffs/scripts/firewall-start"
 		fi
 		rand=$(rand 1 14)
-		m1=$((rand + 0));  m2=$((rand + 15))
-		m3=$((rand + 30)); m4=$((rand + 45))
 		cru d Skynet_update
-		cru a Skynet_update "$m1,$m2,$m3,$m4 * * * * nice -n 19 sh /jffs/scripts/firewall update cru"
+		cru a Skynet_update "$((rand)),$((rand + 15)),$((rand + 30)),$((rand + 45)) * * * * nice -n 19 sh /jffs/scripts/firewall update cru"
 		unload_IPTables
 		unload_LogIPTables
 		unload_IPSets
@@ -874,5 +873,5 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 	rm -f "$dir_temp/"*
 	log_Tail "$dir_skynet/warning.log"
 	log_Tail "$dir_skynet/error.log"
-	firewall_Unmodified "timestamp"
+	script_Unmodified "timestamp"
 fi
