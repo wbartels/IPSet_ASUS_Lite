@@ -56,19 +56,19 @@ loginvalid="disabled"	# enabled | disabled
 debugupdate="enabled"	# enabled | disabled
 
 
-blacklist_set="		<alienvault_reputation>			https://reputation.alienvault.com/reputation.generic  {4}
-					<binarydefense_atif>			https://www.binarydefense.com/banlist.txt  {4}
-					<blocklist_de>					https://lists.blocklist.de/lists/all.txt  {1}
-					<blocklist_net_ua>				https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
-					<cleantalk_7d>					https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
-					<dshield>						https://iplists.firehol.org/files/dshield.netset  {4}
-					<greensnow>						https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<maxmind_high_risk>				https://www.maxmind.com/en/high-risk-ip-sample-list  {16}
-					<myip>							https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
-					<spamhaus_drop>					https://www.spamhaus.org/drop/drop.txt  {16}
-					<spamhaus_edrop>				https://www.spamhaus.org/drop/edrop.txt  {16}
-					<talosintel>					https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
-					<tor_exits>						https://check.torproject.org/exit-addresses  {1}"
+blacklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.generic  {4}
+					<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
+					<blocklist.de>			https://lists.blocklist.de/lists/all.txt  {1}
+					<blocklist.net.ua>		https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
+					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
+					<dshield>				https://iplists.firehol.org/files/dshield.netset  {4}
+					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
+					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {16}
+					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
+					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {16}
+					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {16}
+					<talosintel>			https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
+					<tor_exits>				https://check.torproject.org/exit-addresses  {1}"
 blacklist_ip=""
 blacklist_domain=""
 blacklist_asn=""
@@ -86,7 +86,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.22i"
+version="1.22j"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -537,10 +537,11 @@ load_Set() {
 	ipset destroy "Skynet-Temp"
 	update_Counter "$dir_update/$setname" >/dev/null
 	if [ "$debugupdate" = "enabled" ]; then
-		printf "$(date '+%b %d %T') | %7s | %7s |\n" \
+		printf "$(date '+%b %d %T') | %6s | %7s | %7s |\n" \
+			"$(wc -l < "$filtered_temp")" \
 			"-$(diff "$filtered_cache" "$filtered_temp" | grep -E '^-[1-9]' | wc -l)" \
-			"+$(diff "$filtered_cache" "$filtered_temp" | grep -E '^\+[1-9]' | wc -l)" >> "$dir_debug/$comment.log";
-		log_Tail "$dir_debug/$comment.log";
+			"+$(diff "$filtered_cache" "$filtered_temp" | grep -E '^\+[1-9]' | wc -l)" >> "$dir_debug/$comment.log"
+		log_Tail "$dir_debug/$comment.log"
 	fi
 }
 
