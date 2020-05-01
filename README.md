@@ -4,10 +4,11 @@ Lightweight firewall addition for ARM/HND based ASUS Routers using IPSet.
 Skynet Lite relies on the IPTables from Skynet by Adamm.
 
 ## Some key features
-- Small one file shell script (also uses tmp directory).
+- Small one file shell script, witch also uses a temp directory.
 - No need for an external USB drive.
 - Only updates new or changed ipsets.
-- To prevent downtime use the ipset swap feature.
+- Use the ipset swap feature to prevent downtime on bulky changes.
+- For smaller changes incremental update is used.
 
 ## Installation
 Ensure you have an [Asuswrt-Merlin](https://www.asuswrt-merlin.net/) firmware and enabled the JFFS2 partition:
