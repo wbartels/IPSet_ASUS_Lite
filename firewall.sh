@@ -86,7 +86,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.22j"
+version="1.25"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -197,9 +197,7 @@ unload_IPSets() {
 
 lookup_Domain() {
 	set -o pipefail; nslookup "$1" 2>/dev/null | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk 'NR>2'
-	if [ $? -ne 0 ]; then
-		log_Skynet "[*] nslookup can't resolve $1"
-	fi
+	if [ $? -ne 0 ]; then log_Skynet "[*] nslookup can't resolve $1"; fi
 }
 
 
@@ -450,7 +448,7 @@ load_Whitelist() {
 	rm -f "$temp";
 	# Update ipset:
 	ipset -q destroy "Skynet-Temp"
-	ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" comment
+	ipset create Skynet-Temp hash:net comment
 	ipset restore -! -f "$dir_temp/ipset"
 	ipset swap "Skynet-Whitelist" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
@@ -462,7 +460,7 @@ load_Blacklist() {
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Blacklist')"
 	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' > "$dir_temp/ipset"
 	ipset -q destroy "Skynet-Temp"
-	ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" comment
+	ipset create Skynet-Temp hash:net comment
 	ipset restore -! -f "$dir_temp/ipset"
 	ipset swap "Skynet-Blacklist" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
@@ -480,7 +478,7 @@ load_Domain() {
 	done
 	wait
 	ipset -q destroy "Skynet-Temp"
-	ipset create Skynet-Temp hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" comment
+	ipset create Skynet-Temp hash:net comment
 	ipset restore -! -f "$dir_temp/ipset"
 	ipset swap "Skynet-Domain" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
@@ -516,7 +514,7 @@ load_ASN() {
 	wait
 	if [ -f "$dir_reload/asn" ] || [ -f "$dir_temp/asn_too_many_requests" ]; then return; fi
 	ipset -q destroy "Skynet-Temp"
-	ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" comment
+	ipset create "Skynet-Temp" hash:net hashsize 4096 maxelem 262144 comment
 	ipset restore -! -f "$dir_temp/ipset"
 	ipset swap "Skynet-ASN" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
@@ -525,24 +523,37 @@ load_ASN() {
 
 load_Set() {
 	log_Skynet "[i] Update $comment"
-	awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' "$filtered_temp" > "$dir_temp/ipset"
+	diff "$filtered_cache" "$filtered_temp" | grep -E '^[-+][0-9]' > "$dir_temp/diff"
 	if ! ipset list -n "$setname" >/dev/null 2>&1; then
-		ipset create "$setname" hash:net hashsize 64 maxelem 262144 comment
+		ipset create "$setname" hash:net comment
 		ipset add Skynet-Master "$setname" comment "$comment"
 	fi
-	ipset -q destroy "Skynet-Temp"
-	ipset create "Skynet-Temp" hash:net hashsize "$(($(wc -l < "$dir_temp/ipset") + 8))" maxelem 262144 comment
-	ipset restore -! -f "$dir_temp/ipset"
-	ipset swap "$setname" "Skynet-Temp"
-	ipset destroy "Skynet-Temp"
-	update_Counter "$dir_update/$setname" >/dev/null
+	if [ $(wc -l < "$dir_temp/diff") -le 256 ] && [ $(wc -l < "$filtered_temp") -ge 512 ]; then
+		true > "$dir_temp/ipset"
+		while IFS= read -r line; do
+			if [ "$(echo "$line" | cut -c-1)" = "-" ]; then
+				printf "del %s %s\n" "$setname" "$(echo "$line" | cut -c2-)" >> "$dir_temp/ipset"
+			else
+				printf "add %s %s comment \"Blacklist: %s\"\n" "$setname" "$(echo "$line" | cut -c2-)" "$comment" >> "$dir_temp/ipset"
+			fi
+		done < "$dir_temp/diff"
+		ipset restore -! -f "$dir_temp/ipset"
+	else
+		awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' "$filtered_temp" > "$dir_temp/ipset"
+		ipset -q destroy "Skynet-Temp"
+		ipset create "Skynet-Temp" hash:net hashsize 4096 maxelem 262144 comment
+		ipset restore -! -f "$dir_temp/ipset"
+		ipset swap "$setname" "Skynet-Temp"
+		ipset destroy "Skynet-Temp"
+	fi
 	if [ "$debugupdate" = "enabled" ]; then
 		printf "$(date '+%b %d %T') | %6s | %7s | %7s |\n" \
 			"$(wc -l < "$filtered_temp")" \
-			"-$(diff "$filtered_cache" "$filtered_temp" | grep -E '^-[1-9]' | wc -l)" \
-			"+$(diff "$filtered_cache" "$filtered_temp" | grep -E '^\+[1-9]' | wc -l)" >> "$dir_debug/$comment.log"
+			"-$(grep -E '^-' < "$dir_temp/diff" | wc -l)" \
+			"+$(grep -E '^\+' < "$dir_temp/diff" | wc -l)" >> "$dir_debug/$comment.log"
 		log_Tail "$dir_debug/$comment.log"
 	fi
+	update_Counter "$dir_update/$setname" >/dev/null
 }
 
 
@@ -643,9 +654,7 @@ download_Set() {
 i=0
 while [ "$(nvram get ntp_ready)" = "0" ]; do
 	if [ $i -eq 0 ]; then log_Skynet "[i] Waiting for NTP to sync..."; fi
-	if [ $i -eq 300 ]; then
-		log_Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!"
-		echo; exit 1;
+	if [ $i -eq 300 ]; then log_Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!"; echo; exit 1;
 	fi
 	i=$((i + 1)); sleep 1
 done
@@ -658,9 +667,7 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 		if ping -q -w1 -c1 github.com >/dev/null 2>&1; then break; fi
 		if ping -q -w1 -c1 amazon.com >/dev/null 2>&1; then break; fi
 		if [ $i -eq 1 ]; then log_Skynet "[!] Waiting for internet connectivity..."; fi
-		if [ $i -eq 6 ]; then
-			log_Skynet "[*] Internet connectivity error"
-			echo; exit 1
+		if [ $i -eq 6 ]; then log_Skynet "[*] Internet connectivity error"; echo; exit 1
 		fi
 		sleep 9
 	done
@@ -722,10 +729,10 @@ case "$command" in
 		unload_LogIPTables
 		unload_IPSets
 		echo 'create Skynet-Master list:set size 64 comment counters
-			create Skynet-Blacklist hash:net hashsize 64 comment
-			create Skynet-Domain hash:net hashsize 64 comment
-			create Skynet-ASN hash:net hashsize 64 comment
-			create Skynet-Whitelist hash:net hashsize 64 comment
+			create Skynet-Blacklist hash:net comment
+			create Skynet-Domain hash:net comment
+			create Skynet-ASN hash:net comment
+			create Skynet-Whitelist hash:net comment
 			add Skynet-Master Skynet-Blacklist comment "blacklist_ip"
 			add Skynet-Master Skynet-Domain comment "blacklist_domain"
 			add Skynet-Master Skynet-ASN comment "blacklist_asn"' | tr -d '\t' | ipset restore -!
