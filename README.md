@@ -7,7 +7,7 @@ Skynet Lite relies on the IPTables from Skynet by Adamm.
 - Small one file shell script, witch also uses a temp directory.
 - No need for an external USB drive.
 - Only updates new or changed ipsets.
-- Always use incremental update far all blacklist sets.
+- Always use incremental update for all blacklist sets.
 - For all other and less frequent updated sets the ipset swap feature will be used.
 
 ## Installation
