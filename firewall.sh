@@ -86,7 +86,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.25b"
+version="1.25c"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -528,7 +528,7 @@ load_Set() {
 		ipset create "$setname" hash:net comment
 		ipset add Skynet-Master "$setname" comment "$comment"
 	fi
-	if [ $(wc -l < "$dir_temp/diff") -le 256 ] && [ $(wc -l < "$filtered_temp") -ge 512 ]; then
+	if [ $(wc -l < "$dir_temp/diff") -le 500 ] && [ $(wc -l < "$filtered_temp") -ge 750 ]; then
 		true > "$dir_temp/ipset"
 		while IFS= read -r line; do
 			if [ "$(echo "$line" | cut -c-1)" = "-" ]; then
