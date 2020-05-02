@@ -86,7 +86,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.25c"
+version="2.00"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -386,14 +386,19 @@ header() {
 footer() {
 	if [ "$option" = "cru" ]; then return; fi
 	echo "-----------------------------------------------------------"
-	printf " %-25s  %30s\n\n" "Uptime $(formatted_File_Age "$dir_system/installtime")" "$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed downloads queued"; fi)"
+	printf " %-25s  %30s\n\n" \
+		"Uptime $(formatted_File_Age "$dir_system/installtime")" \
+		"$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed download queued"
+		elif [ $(ls -1 "$dir_sleep" | wc -l) -ge 1 ]; then echo "[i] Download sleep"; fi)"
 }
 
 
 load_Whitelist() {
 	if [ $((updatecount % 48)) -ne 0 ]; then return; fi
-	local cache= curl_exit= domain= http_code= n=0 temp= url=
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Whitelist')"
+	local cache= curl_exit= domain= http_code= n=0 temp= url=
+	ipset -q destroy "Skynet-Temp"
+	ipset create Skynet-Temp hash:net comment
 	# Whitelist router and reserved IP addresses:
 	echo "add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Whitelist: wan0_ipaddr\"
 		add Skynet-Temp $(nvram get wan0_realip_ip) comment \"Whitelist: wan0_realip_ip\"
@@ -415,9 +420,9 @@ load_Whitelist() {
 		add Skynet-Temp 198.18.0.0/15 comment \"Whitelist: Network interconnect device benchmark testing\"
 		add Skynet-Temp 198.51.100.0/24 comment \"Whitelist: TEST-NET-2\"
 		add Skynet-Temp 203.0.113.0/24 comment \"Whitelist: TEST-NET-3\"
-		add Skynet-Temp 224.0.0.0/3 comment \"Whitelist: Multicast/reserved/limited broadcast\"" | tr -d '\t' | filter_IP_Line > "$dir_temp/ipset"
+		add Skynet-Temp 224.0.0.0/3 comment \"Whitelist: Multicast/reserved/limited broadcast\"" | tr -d '\t' | filter_IP_Line | ipset restore -!
 	# Whitelist ip:
-	echo "$whitelist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' >> "$dir_temp/ipset"
+	echo "$whitelist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' | ipset restore -!
 	# Whitelist domain:
 	whitelist_domain="$whitelist_domain $(echo "$blacklist_set $(nvram get firmware_server)" | strip_Domain)
 		internic.net
@@ -431,7 +436,7 @@ load_Whitelist() {
 		$(nvram get ntp_server0)
 		$(nvram get ntp_server1)"
 	for domain in $(echo "$whitelist_domain" | filter_Domain); do
-		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
+		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' | ipset restore -! &
 		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
 	done
 	wait
@@ -443,13 +448,9 @@ load_Whitelist() {
 		mv -f "$temp" "$cache"
 	fi
 	if [ -f "$cache" ]; then
-		filter_IP_CIDR < "$cache" | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' >> "$dir_temp/ipset"
+		filter_IP_CIDR < "$cache" | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' | ipset restore -!
 	fi
 	rm -f "$temp";
-	# Update ipset:
-	ipset -q destroy "Skynet-Temp"
-	ipset create Skynet-Temp hash:net comment
-	ipset restore -! -f "$dir_temp/ipset"
 	ipset swap "Skynet-Whitelist" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
 }
@@ -458,10 +459,9 @@ load_Whitelist() {
 load_Blacklist() {
 	if script_Unmodified; then return; fi
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Blacklist')"
-	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' > "$dir_temp/ipset"
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net comment
-	ipset restore -! -f "$dir_temp/ipset"
+	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' | ipset restore -!
 	ipset swap "Skynet-Blacklist" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
 }
@@ -469,17 +469,15 @@ load_Blacklist() {
 
 load_Domain() {
 	if [ $((updatecount % 48)) -ne 0 ]; then return; fi
-	local domain= n=0
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Domain')"
-	true > "$dir_temp/ipset"
+	local domain= n=0
+	ipset -q destroy "Skynet-Temp"
+	ipset create Skynet-Temp hash:net comment
 	for domain in $(echo "$blacklist_domain" | filter_Domain); do
-		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' >> "$dir_temp/ipset" &
+		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' | ipset restore -! &
 		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
 	done
 	wait
-	ipset -q destroy "Skynet-Temp"
-	ipset create Skynet-Temp hash:net comment
-	ipset restore -! -f "$dir_temp/ipset"
 	ipset swap "Skynet-Domain" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
 }
@@ -487,17 +485,18 @@ load_Domain() {
 
 load_ASN() {
 	if [ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ]; then return; fi
-	local asn= n=0
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-ASN')"
+	local asn= n=0
 	rm -f "$dir_reload/asn"
-	true > "$dir_temp/ipset"
+	ipset -q destroy "Skynet-Temp"
+	ipset create "Skynet-Temp" hash:net comment
 	for asn in $(echo "$blacklist_asn" | filter_ASN); do
 		(	# subshell
 			url="https://ipinfo.io/$asn"
 			temp="$dir_temp/$asn"
 			http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url"); curl_exit=$?
 			if [ $curl_exit -eq 0 ]; then
-				filter_IP_CIDR < "$temp" | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' >> "$dir_temp/ipset"
+				filter_IP_CIDR < "$temp" | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' | ipset restore -!
 			elif [ "$http_code" = "429" ]; then
 				log_Skynet "[*] Download error HTTP/429 Too many requests $url"
 				touch "$dir_temp/asn_too_many_requests"
@@ -513,9 +512,6 @@ load_ASN() {
 	done
 	wait
 	if [ -f "$dir_reload/asn" ] || [ -f "$dir_temp/asn_too_many_requests" ]; then return; fi
-	ipset -q destroy "Skynet-Temp"
-	ipset create "Skynet-Temp" hash:net hashsize 4096 maxelem 262144 comment
-	ipset restore -! -f "$dir_temp/ipset"
 	ipset swap "Skynet-ASN" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
 }
@@ -523,35 +519,20 @@ load_ASN() {
 
 load_Set() {
 	log_Skynet "[i] Update $comment"
-	diff "$filtered_cache" "$filtered_temp" | grep -E '^[-+][0-9]' > "$dir_temp/diff"
 	if ! ipset list -n "$setname" >/dev/null 2>&1; then
-		ipset create "$setname" hash:net comment
+		ipset create "$setname" hash:net maxelem 262144 comment
 		ipset add Skynet-Master "$setname" comment "$comment"
 	fi
-	if [ $(wc -l < "$dir_temp/diff") -le 500 ] && [ $(wc -l < "$filtered_temp") -ge 750 ]; then
-		true > "$dir_temp/ipset"
-		while IFS= read -r line; do
-			if [ "$(echo "$line" | cut -c-1)" = "-" ]; then
-				printf "del %s %s\n" "$setname" "$(echo "$line" | cut -c2-)" >> "$dir_temp/ipset"
-			else
-				printf "add %s %s comment \"Blacklist: %s\"\n" "$setname" "$(echo "$line" | cut -c2-)" "$comment" >> "$dir_temp/ipset"
-			fi
-		done < "$dir_temp/diff"
-		ipset restore -! -f "$dir_temp/ipset"
-	else
-		awk -v comment="$comment" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, comment}' "$filtered_temp" > "$dir_temp/ipset"
-		ipset -q destroy "Skynet-Temp"
-		ipset create "Skynet-Temp" hash:net hashsize 4096 maxelem 262144 comment
-		ipset restore -! -f "$dir_temp/ipset"
-		ipset swap "$setname" "Skynet-Temp"
-		ipset destroy "Skynet-Temp"
-	fi
+	diff "$filtered_cache" "$filtered_temp" | grep -E '^-[0-9]' | cut -c2- > "$dir_temp/del"
+	diff "$filtered_cache" "$filtered_temp" | grep -E '^\+[0-9]' | cut -c2- > "$dir_temp/add"
+	awk -v setname="$setname" '{printf "del %s %s\n", setname, $1}' "$dir_temp/del" | ipset restore -!
+	awk -v setname="$setname" -v comment="$comment" '{printf "add %s %s comment \"Blacklist: %s\"\n", setname, $1, comment}' "$dir_temp/add" | ipset restore -!
 	if [ "$debugupdate" = "enabled" ]; then
 		printf "%s | %6s | %7s | %7s |\n" \
 			"$(date '+%b %d %T')" \
 			"$(wc -l < "$filtered_temp")" \
-			"-$(grep -E '^-' < "$dir_temp/diff" | wc -l)" \
-			"+$(grep -E '^\+' < "$dir_temp/diff" | wc -l)" >> "$dir_debug/$comment.log"
+			"-$(wc -l < "$dir_temp/del")" \
+			"+$(wc -l < "$dir_temp/add")" >> "$dir_debug/$comment.log"
 		log_Tail "$dir_debug/$comment.log"
 	fi
 	update_Counter "$dir_update/$setname" >/dev/null
