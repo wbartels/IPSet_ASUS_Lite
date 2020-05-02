@@ -20,7 +20,7 @@
 #
 # Commands:
 # firewall
-# firewall 1.1.1.1
+# firewall 10.0.0.0
 # firewall fresh
 # firewall frequency
 # firewall entries
@@ -86,7 +86,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="1.25"
+version="1.25b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -309,7 +309,7 @@ log_Skynet() {
 
 log_Tail() {
 	touch "$1"
-	if [ $(wc -l < "$1") -ge 700 ]; then
+	if [ $(wc -l < "$1") -ge 725 ]; then
 		tail -n 675 "$1" > "$dir_temp/log" && mv -f "$dir_temp/log" "$1"
 	fi
 }
@@ -547,7 +547,8 @@ load_Set() {
 		ipset destroy "Skynet-Temp"
 	fi
 	if [ "$debugupdate" = "enabled" ]; then
-		printf "$(date '+%b %d %T') | %6s | %7s | %7s |\n" \
+		printf "%s | %6s | %7s | %7s |\n" \
+			"$(date '+%b %d %T')" \
 			"$(wc -l < "$filtered_temp")" \
 			"-$(grep -E '^-' < "$dir_temp/diff" | wc -l)" \
 			"+$(grep -E '^\+' < "$dir_temp/diff" | wc -l)" >> "$dir_debug/$comment.log"
@@ -654,8 +655,7 @@ download_Set() {
 i=0
 while [ "$(nvram get ntp_ready)" = "0" ]; do
 	if [ $i -eq 0 ]; then log_Skynet "[i] Waiting for NTP to sync..."; fi
-	if [ $i -eq 300 ]; then log_Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!"; echo; exit 1;
-	fi
+	if [ $i -eq 300 ]; then log_Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!"; echo; exit 1; fi
 	i=$((i + 1)); sleep 1
 done
 start_time=$(($(date +%s) - i))
@@ -667,8 +667,7 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 		if ping -q -w1 -c1 github.com >/dev/null 2>&1; then break; fi
 		if ping -q -w1 -c1 amazon.com >/dev/null 2>&1; then break; fi
 		if [ $i -eq 1 ]; then log_Skynet "[!] Waiting for internet connectivity..."; fi
-		if [ $i -eq 6 ]; then log_Skynet "[*] Internet connectivity error"; echo; exit 1
-		fi
+		if [ $i -eq 6 ]; then log_Skynet "[*] Internet connectivity error"; echo; exit 1; fi
 		sleep 9
 	done
 fi
@@ -851,7 +850,7 @@ case "$command" in
 	help)
 		header "Commands"
 		echo " firewall"
-		echo " firewall 1.1.1.1"
+		echo " firewall 10.0.0.0"
 		echo " firewall fresh"
 		echo " firewall frequency"
 		echo " firewall entries"
