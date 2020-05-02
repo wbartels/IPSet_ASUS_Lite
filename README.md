@@ -7,8 +7,8 @@ Skynet Lite relies on the IPTables from Skynet by Adamm.
 - Small one file shell script, witch also uses a temp directory.
 - No need for an external USB drive.
 - Only updates new or changed ipsets.
-- Use the ipset swap feature to prevent downtime on bulky changes.
-- For smaller changes incremental update is used.
+- Always use incremental update far all blacklist sets.
+- For all other and less frequent updated sets the ipset swap feature will be used.
 
 ## Installation
 Ensure you have an [Asuswrt-Merlin](https://www.asuswrt-merlin.net/) firmware and enabled the JFFS2 partition:
