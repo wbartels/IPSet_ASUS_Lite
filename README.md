@@ -34,7 +34,7 @@ sh /jffs/scripts/firewall uninstall
 
 ```
 firewall
-firewall 1.1.1.1
+firewall 10.0.0.0
 firewall fresh
 firewall frequency
 firewall entries
