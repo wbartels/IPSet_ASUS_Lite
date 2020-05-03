@@ -86,7 +86,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="2.00b"
+version="2.00c"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -523,8 +523,9 @@ load_Set() {
 		ipset create "$setname" hash:net maxelem 524288 comment
 		ipset add Skynet-Master "$setname" comment "$comment"
 	fi
-	diff "$filtered_cache" "$filtered_temp" | grep -E '^\+[0-9]' | cut -c2- > "$dir_temp/add"
-	diff "$filtered_cache" "$filtered_temp" | grep -E '^-[0-9]' | cut -c2- > "$dir_temp/del"
+	diff "$filtered_cache" "$filtered_temp" > "$dir_temp/diff"
+	grep -E '^\+[0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/add"
+	grep -E '^-[0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/del"
 	awk -v setname="$setname" -v comment="$comment" '{printf "add %s %s comment \"Blacklist: %s\"\n", setname, $1, comment}' "$dir_temp/add" | ipset restore -!
 	awk -v setname="$setname" '{printf "del %s %s\n", setname, $1}' "$dir_temp/del" | ipset restore -!
 	if [ "$debugupdate" = "enabled" ]; then
@@ -536,6 +537,7 @@ load_Set() {
 		log_Tail "$dir_debug/$comment.log"
 	fi
 	update_Counter "$dir_update/$setname" >/dev/null
+	rm -f "$dir_temp/diff" "$dir_temp/add" "$dir_temp/del"
 }
 
 
