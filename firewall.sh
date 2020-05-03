@@ -86,7 +86,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="2.00"
+version="2.00b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -376,16 +376,16 @@ header() {
 	echo " Code is based on Skynet By Adamm"
 	echo
 	if [ -n "$1" ] || [ -n "$2" ]; then
-		echo "-----------------------------------------------------------"
+		printf "-----------------------------------------------------------\n"
 		printf " %-25s  %30s\n" "$1" "$2"
-		echo "-----------------------------------------------------------"
+		printf "-----------------------------------------------------------\n"
 	fi
 }
 
 
 footer() {
 	if [ "$option" = "cru" ]; then return; fi
-	echo "-----------------------------------------------------------"
+	printf "-----------------------------------------------------------\n"
 	printf " %-25s  %30s\n\n" \
 		"Uptime $(formatted_File_Age "$dir_system/installtime")" \
 		"$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed download queued"
@@ -508,10 +508,10 @@ load_ASN() {
 			rm -f "$temp"
 		) &
 		n=$((n + 1)); if [ $((n % 10)) -eq 0 ]; then wait; fi
-		if [ -f "$dir_reload/asn" ] || [ -f "$dir_temp/asn_too_many_requests" ]; then return; fi
+		if [ -f "$dir_reload/asn" ] || [ -f "$dir_temp/asn_too_many_requests" ]; then ipset destroy "Skynet-Temp"; return; fi
 	done
 	wait
-	if [ -f "$dir_reload/asn" ] || [ -f "$dir_temp/asn_too_many_requests" ]; then return; fi
+	if [ -f "$dir_reload/asn" ] || [ -f "$dir_temp/asn_too_many_requests" ]; then ipset destroy "Skynet-Temp"; return; fi
 	ipset swap "Skynet-ASN" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
 }
@@ -520,13 +520,13 @@ load_ASN() {
 load_Set() {
 	log_Skynet "[i] Update $comment"
 	if ! ipset list -n "$setname" >/dev/null 2>&1; then
-		ipset create "$setname" hash:net maxelem 262144 comment
+		ipset create "$setname" hash:net maxelem 524288 comment
 		ipset add Skynet-Master "$setname" comment "$comment"
 	fi
-	diff "$filtered_cache" "$filtered_temp" | grep -E '^-[0-9]' | cut -c2- > "$dir_temp/del"
 	diff "$filtered_cache" "$filtered_temp" | grep -E '^\+[0-9]' | cut -c2- > "$dir_temp/add"
-	awk -v setname="$setname" '{printf "del %s %s\n", setname, $1}' "$dir_temp/del" | ipset restore -!
+	diff "$filtered_cache" "$filtered_temp" | grep -E '^-[0-9]' | cut -c2- > "$dir_temp/del"
 	awk -v setname="$setname" -v comment="$comment" '{printf "add %s %s comment \"Blacklist: %s\"\n", setname, $1, comment}' "$dir_temp/add" | ipset restore -!
+	awk -v setname="$setname" '{printf "del %s %s\n", setname, $1}' "$dir_temp/del" | ipset restore -!
 	if [ "$debugupdate" = "enabled" ]; then
 		printf "%s | %6s | %7s | %7s |\n" \
 			"$(date '+%b %d %T')" \
