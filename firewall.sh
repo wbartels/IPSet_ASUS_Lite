@@ -86,7 +86,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="2.00c"
+version="2.00d"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -807,10 +807,10 @@ case "$command" in
 
 
 	frequency)
-		header "Blacklist" "Average update frequency"
+		header "Blacklist" "Average update time"
 		true > "$dir_temp/file.csv"
 		filter_Skynet_Set < "$dir_system/lookup.csv" | while IFS=, read -r setname comment; do
-			n=$(head -1 "$dir_update/$setname" 2>/dev/null); if ! [ "$n" -gt 0 ] 2>/dev/null; then n=1; fi
+			n=$(head -1 "$dir_update/$setname" 2>/dev/null || echo 1)
 			sec=$(($(file_Age "$dir_system/installtime") / n))
 			echo "$comment,$(formatted_Time "$sec"),$sec" >> "$dir_temp/file.csv"
 		done
