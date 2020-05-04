@@ -86,7 +86,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="2.00d"
+version="2.00e"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -567,7 +567,7 @@ download_Set() {
 		if [ -z "$update_cycles" ]; then
 			update_cycles=4
 		fi
-		if [ -f "$dir_reload/$setname" ]; then
+		if [ -f "$dir_reload/$setname" ] || ! script_Unmodified; then
 			update_cycles=1
 			rm -f "$dir_reload/$setname"
 		fi
