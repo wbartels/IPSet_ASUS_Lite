@@ -86,7 +86,7 @@ option="$2"
 throttle="0"
 updatecount="0"
 iotblocked="disabled"
-version="2.00e"
+version="2.00f"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -725,6 +725,7 @@ case "$command" in
 		load_Domain
 		load_ASN
 		download_Set
+		script_Unmodified "timestamp"
 		footer
 	;;
 
@@ -737,6 +738,7 @@ case "$command" in
 		load_Domain
 		load_ASN
 		download_Set
+		script_Unmodified "timestamp"
 		footer
 	;;
 
@@ -859,9 +861,6 @@ case "$command" in
 esac
 
 
-if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
-	rm -f "$dir_temp/"*
-	log_Tail "$dir_skynet/warning.log"
-	log_Tail "$dir_skynet/error.log"
-	script_Unmodified "timestamp"
-fi
+rm -f "$dir_temp/"*
+log_Tail "$dir_skynet/warning.log"
+log_Tail "$dir_skynet/error.log"
