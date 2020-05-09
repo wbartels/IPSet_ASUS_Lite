@@ -61,9 +61,8 @@ blacklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.gen
 					<blocklist.de>			https://lists.blocklist.de/lists/all.txt  {1}
 					<blocklist.net.ua>		https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
-					<dshield>				https://iplists.firehol.org/files/dshield.netset  {4}
+					<dshield>				https://iplists.firehol.org/files/dshield_1d.netset  {4}
 					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {16}
 					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {16}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {16}
@@ -83,10 +82,10 @@ whitelist_domain=""
 
 command="$1"
 option="$2"
-throttle="0"
-updatecount="0"
+throttle=0
+updatecount=0
 iotblocked="disabled"
-version="2.00f"
+version="2.00g"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -202,7 +201,7 @@ lookup_Domain() {
 
 
 strip_Domain() {
-	grep -Eo 'https?://\S+' | cut -d'/' -f3 | awk '!x[$0]++'
+	grep -Eo 'https?://\S+' | cut -d'/' -f3
 }
 
 
@@ -357,13 +356,12 @@ script_Unmodified() {
 
 update_Counter() {
 	local n=$(head -1 "$1" 2>/dev/null)
-	n=$((n + 1))
-	echo "$n" | tee "$1"
+	echo $((n + 1)) | tee "$1"
 }
 
 
 rand() {
-	local min="$1" max="$2"
+	local min=$1 max=$2
 	echo $((min + $(printf '%d' 0x$(openssl rand 2 -hex)) * (max - min + 1) / 65025))
 }
 
@@ -435,7 +433,7 @@ load_Whitelist() {
 		one.one.one.one
 		$(nvram get ntp_server0)
 		$(nvram get ntp_server1)"
-	for domain in $(echo "$whitelist_domain" | filter_Domain); do
+	for domain in $(echo "$whitelist_domain" | filter_Domain | awk '!x[$0]++'); do
 		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' | ipset restore -! &
 		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
 	done
@@ -496,7 +494,7 @@ load_ASN() {
 			temp="$dir_temp/$asn"
 			http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url"); curl_exit=$?
 			if [ $curl_exit -eq 0 ]; then
-				filter_IP_CIDR < "$temp" | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | awk '!x[$0]++' | ipset restore -!
+				filter_IP_CIDR < "$temp" | awk '!x[$0]++' | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | ipset restore -!
 			elif [ "$http_code" = "429" ]; then
 				log_Skynet "[*] Download error HTTP/429 Too many requests $url"
 				touch "$dir_temp/asn_too_many_requests"
