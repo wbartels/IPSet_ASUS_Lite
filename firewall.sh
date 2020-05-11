@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.00h"
+version="2.00i"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -541,11 +541,17 @@ load_Set() {
 
 
 compare_Set() {
-	filter_IP_CIDR < "$temp" | filter_PrivateIP | sort -u > "$filtered_temp"
+	case "$url" in
+		*.zip)			unzip -p "$temp" | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp";;
+		*.tar.gz|*.tgz)	tar -xzOf "$temp" | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp";;
+		*.tar.bz2)		tar -xjOf "$temp" | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp";;
+		*.gz|*.bz2)		zcat "$temp" | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp";;
+		*)				filter_IP_CIDR < "$temp" | filter_PrivateIP | sort -u > "$filtered_temp";;
+	esac
 	if [ ! -f "$filtered_cache" ]; then
 		touch "$filtered_cache"
 	fi
-	cmp -s "$filtered_temp" "$filtered_cache"
+	cmp -s "$filtered_cache" "$filtered_temp"
 }
 
 
