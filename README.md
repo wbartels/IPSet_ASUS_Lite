@@ -3,12 +3,12 @@
 Lightweight firewall addition for ARM/HND based ASUS Routers using IPSet.
 Skynet Lite relies on the IPTables from Skynet by Adamm.
 
-## Some key features
-- Small one file shell script, witch also uses a temp directory.
-- No need for an external USB drive.
+## Key features
+- Small one file shell script, no need for an external USB drive.
+- Blacklist sets can be plain text or compressed with: zip, tar.gz, tgz, tar.bz2, gz or bz2
 - Only updates new or changed ipsets.
-- Always use incremental update for all blacklist sets.
-- For all other and less frequent updated sets the ipset swap feature will be used.
+- Use incremental update for all blacklist sets.
+- For all other lists the ipset swap feature is used.
 
 ## Installation
 Ensure you have an [Asuswrt-Merlin](https://www.asuswrt-merlin.net/) firmware and enabled the JFFS2 partition:
@@ -55,7 +55,3 @@ echo 'export PATH=$PATH:/jffs/scripts' >> '/jffs/configs/profile.add'
 ### Donate to Skynet by Adamm
 
 This script will always be open source and free to use, but if you want to support future development you can do so by [Donating With PayPal.](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=BPN4LTRZKDTML)
-
-### About
-
-> Skynet gained self-awareness after it had spread into millions of computer servers all across the world; realizing the extent of its abilities, its creators tried to deactivate it. In the interest of self-preservation, Skynet concluded that all of humanity would attempt to destroy it and impede its capability in safeguarding the world. Its operations are almost exclusively performed by servers, mobile devices, drones, military satellites, war-machines, androids and cyborgs (usually a terminator), and other computer systems. As a programming directive, Skynet's manifestation is that of an overarching, global, artificial intelligence hierarchy (AI takeover), which seeks to exterminate the human race in order to fulfill the mandates of its original coding. (▀̿Ĺ̯▀̿ ̿)
