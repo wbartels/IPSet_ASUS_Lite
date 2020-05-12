@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.00i"
+version="2.00j"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -490,7 +490,7 @@ load_ASN() {
 	ipset -q destroy "Skynet-Temp"
 	ipset create "Skynet-Temp" hash:net comment
 	for asn in $(echo "$blacklist_asn" | filter_ASN); do
-		(	# subshell
+		(
 			url="https://ipinfo.io/$asn"
 			temp="$dir_temp/$asn"
 			http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url"); curl_exit=$?
@@ -541,13 +541,15 @@ load_Set() {
 
 
 compare_Set() {
-	case "$url" in
-		*.zip)			unzip -p "$temp" | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp";;
-		*.tar.gz|*.tgz)	tar -xzOf "$temp" | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp";;
-		*.tar.bz2)		tar -xjOf "$temp" | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp";;
-		*.gz|*.bz2)		zcat "$temp" | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp";;
-		*)				filter_IP_CIDR < "$temp" | filter_PrivateIP | sort -u > "$filtered_temp";;
-	esac
+	{
+		case "$url" in
+			*.zip)			unzip -p "$temp";;
+			*.tar.gz|*.tgz)	tar -xzOf "$temp";;
+			*.tar.bz2)		tar -xjOf "$temp";;
+			*.gz|*.bz2)		zcat "$temp";;
+			*)				cat "$temp";;
+		esac
+	} | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp"
 	if [ ! -f "$filtered_cache" ]; then
 		touch "$filtered_cache"
 	fi
