@@ -5,7 +5,7 @@ Skynet Lite relies on the IPTables from Skynet by Adamm.
 
 ## Key features
 - Small one file shell script, no need for an external USB drive.
-- Blacklist sets can be plain text or compressed with: zip, tar.gz, tgz, tar.bz2, gz or bz2
+- Blacklist sets can be plain text or compressed with: *.zip, *.tgz, *.tar.gz or *.gz
 - Also supports plain text transfer encoding.
 - Only download and update changed blacklist sets.
 - Use incremental update for all blacklist sets.
