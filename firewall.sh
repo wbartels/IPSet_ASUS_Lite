@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.01"
+version="2.01b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -443,7 +443,7 @@ load_Whitelist() {
 	url="http://www.internic.net/domain/named.root"
 	temp="$dir_temp/named.root"; touch "$temp"
 	cache="$dir_cache/named.root"
-	if http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache") && [ "$http_code" = "200" ]; then
+	if http_code=$(curl -sf --location --user-agent "$useragent" --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache") && [ "$http_code" = "200" ]; then
 		mv -f "$temp" "$cache"
 	fi
 	if [ -f "$cache" ]; then
@@ -493,7 +493,7 @@ load_ASN() {
 		(
 			url="https://ipinfo.io/$asn"
 			temp="$dir_temp/$asn"
-			http_code=$(curl -sf --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url"); curl_exit=$?
+			http_code=$(curl -sf --location --user-agent "$useragent" --connect-timeout 10 --max-time 180 --limit-rate "$throttle"  --output "$temp" --write-out "%{http_code}" "$url"); curl_exit=$?
 			if [ $curl_exit -eq 0 ]; then
 				filter_IP_CIDR < "$temp" | awk '!x[$0]++' | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | ipset restore -!
 			elif [ "$http_code" = "429" ]; then
@@ -544,9 +544,8 @@ compare_Set() {
 	{
 		case "$url" in
 			*.zip)			unzip -p "$temp";;
-			*.tar.gz|*.tgz)	tar -xzOf "$temp";;
-			*.tar.bz2)		tar -xjOf "$temp";;
-			*)				zcat "$temp" 2>/dev/null || cat "$temp";;
+			*.tgz|*.tar.gz)	tar -xzOf "$temp";;
+			*)				gunzip -c "$temp" 2>/dev/null || cat "$temp";;
 		esac
 	} | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp"
 	if [ ! -f "$filtered_cache" ]; then
@@ -590,7 +589,7 @@ download_Set() {
 		cache="$dir_cache/$setname"
 		filtered_temp="$dir_temp/${setname}_filtered"
 		filtered_cache="$dir_filtered/$setname"
-		http_code=$(curl -sf --header "Accept-encoding: gzip, bzip2" --location --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --user-agent "$useragent" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
+		http_code=$(curl -sf --location --header "Accept-encoding: gzip" --user-agent "$useragent" --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
 		if [ $curl_exit -eq 0 ]; then
 			if [ "$http_code" = "304" ]; then
 				log_Skynet "[i] Fresh $comment"
