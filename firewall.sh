@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.01d"
+version="2.01e"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -269,31 +269,31 @@ filter_Skynet_Set() {
 
 curl_Error() {
 	case "$1" in
-		1)  echo -n "Unsupported protocol" ;;
-		2)  echo -n "Failed initialization" ;;
-		3)  echo -n "URL malformat" ;;
-		4)  echo -n "Not built in" ;;
-		5)  echo -n "Couldn't resolve proxy" ;;
-		6)  echo -n "Couldn't resolve host" ;;
-		7)  echo -n "Couldn't connect" ;;
-		8)  echo -n "Weird server reply" ;;
-		9)  echo -n "Remote access denied" ;;
-		18) echo -n "Partial file" ;;
-		22) echo -n "HTTP error" ;;
-		23) echo -n "Write error" ;;
-		26) echo -n "Read error" ;;
-		27) echo -n "Out of memory" ;;
-		28) echo -n "Connection timed out" ;;
-		33) echo -n "Range error" ;;
-		35) echo -n "SSL connect error" ;;
-		36) echo -n "Bad download resume" ;;
-		47) echo -n "Too many redirects" ;;
-		52) echo -n "Empty reply from server" ;;
-		55) echo -n "Send error" ;;
-		56) echo -n "Receive error" ;;
-		60) echo -n "Peer failed verification" ;;
-		61) echo -n "Bad content encoding" ;;
-		*)  echo -n "Error $1 returned by curl" ;;
+		1)  printf "Unsupported protocol" ;;
+		2)  printf "Failed initialization" ;;
+		3)  printf "URL malformat" ;;
+		4)  printf "Not built in" ;;
+		5)  printf "Couldn't resolve proxy" ;;
+		6)  printf "Couldn't resolve host" ;;
+		7)  printf "Couldn't connect" ;;
+		8)  printf "Weird server reply" ;;
+		9)  printf "Remote access denied" ;;
+		18) printf "Partial file" ;;
+		22) printf "HTTP error" ;;
+		23) printf "Write error" ;;
+		26) printf "Read error" ;;
+		27) printf "Out of memory" ;;
+		28) printf "Connection timed out" ;;
+		33) printf "Range error" ;;
+		35) printf "SSL connect error" ;;
+		36) printf "Bad download resume" ;;
+		47) printf "Too many redirects" ;;
+		52) printf "Empty reply from server" ;;
+		55) printf "Send error" ;;
+		56) printf "Receive error" ;;
+		60) printf "Peer failed verification" ;;
+		61) printf "Bad content encoding" ;;
+		*)  printf "Error $1 returned by curl" ;;
 	esac
 }
 
@@ -554,7 +554,7 @@ compare_Set() {
 		touch "$filtered_cache"
 	fi
 	cmp -s "$filtered_cache" "$filtered_temp"; cmp_exit=$?
-	printf "%$(echo " [i] Compare $comment" | wc -m)s\r"
+	printf "%$(printf " [i] Compare $comment" | wc -m)s\r"
 	return $cmp_exit
 }
 
