@@ -553,7 +553,7 @@ compare_Set() {
 		touch "$filtered_cache"
 	fi
 	cmp -s "$filtered_cache" "$filtered_temp"
-	printf "%$(echo "             $comment" | wc -m)s)\r"
+	printf "%$(echo "             $comment" | wc -m)s\r"
 }
 
 
