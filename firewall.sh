@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.01c"
+version="2.01d"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -542,6 +542,7 @@ load_Set() {
 
 compare_Set() {
 	printf " [i] Compare $comment\r"
+	local cmp_exit=
 	{
 		case "$url" in
 			*.zip)			unzip -p "$temp";;
@@ -552,8 +553,9 @@ compare_Set() {
 	if [ ! -f "$filtered_cache" ]; then
 		touch "$filtered_cache"
 	fi
-	cmp -s "$filtered_cache" "$filtered_temp"
-	printf "%$(echo "             $comment" | wc -m)s\r"
+	cmp -s "$filtered_cache" "$filtered_temp"; cmp_exit=$?
+	printf "%$(echo " [i] Compare $comment" | wc -m)s\r"
+	return $cmp_exit
 }
 
 
