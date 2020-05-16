@@ -61,12 +61,12 @@ blacklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.gen
 					<blocklist.de>			https://lists.blocklist.de/lists/all.txt  {1}
 					<blocklist.net.ua>		https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
-					<dshield>				https://iplists.firehol.org/files/dshield_1d.netset  {4}
+					<dshield>				https://iplists.firehol.org/files/dshield_1d.netset  {1}
 					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {16}
+					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {24}
 					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
-					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {16}
-					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {16}
+					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {24}
+					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {24}
 					<talosintel>			https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
 					<tor_exits>				https://iplists.firehol.org/files/tor_exits.ipset  {1}"
 blacklist_ip=""
@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.01b"
+version="2.01c"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -541,6 +541,7 @@ load_Set() {
 
 
 compare_Set() {
+	printf " [i] Compare $comment\r"
 	{
 		case "$url" in
 			*.zip)			unzip -p "$temp";;
@@ -552,6 +553,7 @@ compare_Set() {
 		touch "$filtered_cache"
 	fi
 	cmp -s "$filtered_cache" "$filtered_temp"
+	printf "%$(echo "             $comment" | wc -m)s)\r"
 }
 
 
