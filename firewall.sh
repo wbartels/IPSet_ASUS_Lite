@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.01e"
+version="2.01f"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -528,8 +528,9 @@ load_Set() {
 	awk -v setname="$setname" -v comment="$comment" '{printf "add %s %s comment \"Blacklist: %s\"\n", setname, $1, comment}' "$dir_temp/add" | ipset restore -!
 	awk -v setname="$setname" '{printf "del %s %s\n", setname, $1}' "$dir_temp/del" | ipset restore -!
 	if [ "$debugupdate" = "enabled" ]; then
-		printf "%s | %6s | %7s | %7s |\n" \
+		printf "%s | %s | %6s | %7s | %7s |\n" \
 			"$(date '+%b %d %T')" \
+			"$(if [ "$option" = "cru" ]; then echo "cron"; else echo "user"; fi)" \
 			"$(wc -l < "$filtered_temp")" \
 			"-$(wc -l < "$dir_temp/del")" \
 			"+$(wc -l < "$dir_temp/add")" >> "$dir_debug/$comment.log"
@@ -655,9 +656,9 @@ start_time=$(($(date +%s) - i))
 
 if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 	for i in 1 2 3 4 5 6; do
-		if ping -q -w1 -c1 google.com >/dev/null 2>&1; then break; fi
-		if ping -q -w1 -c1 github.com >/dev/null 2>&1; then break; fi
-		if ping -q -w1 -c1 amazon.com >/dev/null 2>&1; then break; fi
+		if ping -q -w1 -c1 dns.google >/dev/null 2>&1; then break; fi
+		if ping -q -w1 -c1 one.one.one.one >/dev/null 2>&1; then break; fi
+		if ping -q -w1 -c1 dns.opendns.com >/dev/null 2>&1; then break; fi
 		if [ $i -eq 1 ]; then log_Skynet "[!] Waiting for internet connectivity..."; fi
 		if [ $i -eq 6 ]; then log_Skynet "[*] Internet connectivity error"; echo; exit 1; fi
 		sleep 9
