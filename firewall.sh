@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.01j"
+version="2.01k"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -703,7 +703,7 @@ unset i execution_time
 #######################
 
 
-ip=$(echo "$command" | is_IP) || ip="noip"
+ip=$(echo "$command" | is_IP) && command="ip"
 case "$command" in
 	reset)
 		header "Reset"
@@ -783,7 +783,7 @@ case "$command" in
 	;;
 
 
-	"$ip")
+	ip)
 		header "Search for $ip"
 		while IFS=, read -r setname comment; do
 			if ipset -q test "$setname" "$ip"; then
