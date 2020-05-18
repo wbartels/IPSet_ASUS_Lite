@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.01g"
+version="2.01h"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -310,7 +310,7 @@ log_Skynet() {
 log_Tail() {
 	touch "$1"
 	if [ $(wc -l < "$1") -ge 725 ]; then
-		tail -n 675 "$1" > "$dir_temp/log" && mv -f "$dir_temp/log" "$1"
+		tail -675 "$1" > "$dir_temp/log" && mv -f "$dir_temp/log" "$1"
 	fi
 }
 
@@ -633,7 +633,7 @@ download_Set() {
 	# Cleanup directories
 	for dir in "$dir_cache" "$dir_filtered" "$dir_reload" "$dir_sleep" "$dir_update"; do
 		cd "$dir"
-		for setname in $(ls -1t | filter_Skynet_Set); do
+		for setname in $(ls -1 | filter_Skynet_Set); do
 			if ! echo "$list" | grep -q "$setname"; then
 				rm -f "$setname"
 			fi
@@ -643,7 +643,7 @@ download_Set() {
 	# Cleanup debug directory
 	list=$(filter_Skynet_Set < "$dir_system/lookup.csv" | awk -F, '{print $2 ".log"}')
 	cd "$dir_debug"
-	for comment in $(ls -1t); do
+	for comment in $(ls -1); do
 		if ! echo "$list" | grep -q "$comment"; then
 			rm -f "$comment"
 		fi
