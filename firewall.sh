@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.01h"
+version="2.01i"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -248,7 +248,8 @@ filter_ASN() {
 
 
 filter_Comment() {
-	grep -Eo '<.+>' | tr -d '<>' | tr ',' ';'
+	# xargs removes leading, trailing and double space/tab
+	grep -Eo '<.+>' | tr -d '<>' | tr ',/' ';_' | xargs
 }
 
 
@@ -635,7 +636,7 @@ download_Set() {
 		cd "$dir"
 		for setname in $(ls -1 | filter_Skynet_Set); do
 			if ! echo "$list" | grep -q "$setname"; then
-				rm -f "$setname"
+				rm -f "$dir/$setname"
 			fi
 		done
 	done
@@ -645,7 +646,7 @@ download_Set() {
 	cd "$dir_debug"
 	for comment in $(ls -1); do
 		if ! echo "$list" | grep -q "$comment"; then
-			rm -f "$comment"
+			rm -f "$dir_debug/$comment"
 		fi
 	done
 }
