@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.01i"
+version="2.01j"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -248,8 +248,8 @@ filter_ASN() {
 
 
 filter_Comment() {
-	# xargs removes leading, trailing and double space/tab
-	grep -Eo '<.+>' | tr -d '<>' | tr ',/' ';_' | xargs
+	# https://unix.stackexchange.com/a/205854
+	grep -Eo '<.+>' | tr -d '<>' | tr ',/"' ";_'" | awk '{$1=$1;print}'
 }
 
 
