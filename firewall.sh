@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.01f"
+version="2.01g"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -495,7 +495,7 @@ load_ASN() {
 			temp="$dir_temp/$asn"
 			http_code=$(curl -sf --location --user-agent "$useragent" --connect-timeout 10 --max-time 180 --limit-rate "$throttle"  --output "$temp" --write-out "%{http_code}" "$url"); curl_exit=$?
 			if [ $curl_exit -eq 0 ]; then
-				filter_IP_CIDR < "$temp" | awk '!x[$0]++' | filter_PrivateIP | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | ipset restore -!
+				filter_IP_CIDR < "$temp" | filter_PrivateIP | awk '!x[$0]++' | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | ipset restore -!
 			elif [ "$http_code" = "429" ]; then
 				log_Skynet "[*] Download error HTTP/429 Too many requests $url"
 				touch "$dir_temp/asn_too_many_requests"
@@ -522,15 +522,13 @@ load_Set() {
 		ipset create "$setname" hash:net maxelem 524288 comment
 		ipset add Skynet-Master "$setname" comment "$comment"
 	fi
-	diff "$filtered_cache" "$filtered_temp" > "$dir_temp/diff"
-	grep -E '^\+[0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/add"
-	grep -E '^-[0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/del"
+	grep -E '^[+][0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/add"
+	grep -E '^[-][0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/del"
 	awk -v setname="$setname" -v comment="$comment" '{printf "add %s %s comment \"Blacklist: %s\"\n", setname, $1, comment}' "$dir_temp/add" | ipset restore -!
 	awk -v setname="$setname" '{printf "del %s %s\n", setname, $1}' "$dir_temp/del" | ipset restore -!
 	if [ "$debugupdate" = "enabled" ]; then
-		printf "%s | %s | %6s | %7s | %7s |\n" \
+		printf "%s | %6s | %7s | %7s |\n" \
 			"$(date '+%b %d %T')" \
-			"$(if [ "$option" = "cru" ]; then echo "cron"; else echo "user"; fi)" \
 			"$(wc -l < "$filtered_temp")" \
 			"-$(wc -l < "$dir_temp/del")" \
 			"+$(wc -l < "$dir_temp/add")" >> "$dir_debug/$comment.log"
@@ -543,7 +541,14 @@ load_Set() {
 
 compare_Set() {
 	printf " [i] Compare $comment\r"
-	local cmp_exit=
+	local diff_exit=
+	if cmp -s "$cache" "$temp"; then
+		printf "%$(($(printf "$comment" | wc -m) + 13))s\r"
+		return 0
+	fi
+	if [ ! -f "$filtered_cache" ]; then
+		touch "$filtered_cache"
+	fi
 	{
 		case "$url" in
 			*.zip)			unzip -p "$temp";;
@@ -551,12 +556,9 @@ compare_Set() {
 			*)				gunzip -c "$temp" 2>/dev/null || cat "$temp";;
 		esac
 	} | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp"
-	if [ ! -f "$filtered_cache" ]; then
-		touch "$filtered_cache"
-	fi
-	cmp -s "$filtered_cache" "$filtered_temp"; cmp_exit=$?
-	printf "%$(printf " [i] Compare $comment" | wc -m)s\r"
-	return $cmp_exit
+	diff "$filtered_cache" "$filtered_temp" > "$dir_temp/diff"; diff_exit=$?
+	printf "%$(($(printf "$comment" | wc -m) + 13))s\r"
+	return $diff_exit
 }
 
 
@@ -620,7 +622,7 @@ download_Set() {
 	if script_Unmodified; then return; fi
 
 	# Unload unlisted sets
-	list=$(awk -F, '{print $1}' "$dir_system/lookup.csv" | filter_Skynet_Set)
+	list=$(filter_Skynet_Set < "$dir_system/lookup.csv" | awk -F, '{print $1}')
 	for setname in $(ipset list Skynet-Master | filter_Skynet_Set | awk '{print $1}'); do
 		if ! echo "$list" | grep -q "$setname"; then
 			ipset -q del "Skynet-Master" "$setname"
@@ -633,9 +635,18 @@ download_Set() {
 		cd "$dir"
 		for setname in $(ls -1t | filter_Skynet_Set); do
 			if ! echo "$list" | grep -q "$setname"; then
-				rm -f "$dir/$setname"
+				rm -f "$setname"
 			fi
 		done
+	done
+
+	# Cleanup debug directory
+	list=$(filter_Skynet_Set < "$dir_system/lookup.csv" | awk -F, '{print $2 ".log"}')
+	cd "$dir_debug"
+	for comment in $(ls -1t); do
+		if ! echo "$list" | grep -q "$comment"; then
+			rm -f "$comment"
+		fi
 	done
 }
 
@@ -862,7 +873,7 @@ case "$command" in
 	*)
 		header "Blacklist" "Packets blocked"
 		true > "$dir_temp/file.csv"
-		ipset list Skynet-Master | filter_Skynet | awk '{print $1","$3}' | while IFS=, read -r setname blocked; do
+		ipset list Skynet-Master | filter_Skynet | awk '{print $1 "," $3}' | while IFS=, read -r setname blocked; do
 			echo "$(lookup_Comment "$setname"),$blocked" >> "$dir_temp/file.csv"
 		done
 		sort -t, -k2nr -k1,1 < "$dir_temp/file.csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
