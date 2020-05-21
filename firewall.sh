@@ -58,15 +58,15 @@ debugupdate="enabled"	# enabled | disabled
 
 blacklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.generic  {4}
 					<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
-					<blocklist.de>			https://lists.blocklist.de/lists/all.txt  {1}
+					<blocklist.de>			https://iplists.firehol.org/files/blocklist_de.ipset  {1}
 					<blocklist.net.ua>		https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>				https://iplists.firehol.org/files/dshield_1d.netset  {1}
 					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {24}
+					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
 					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
-					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {24}
-					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {24}
+					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
+					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
 					<talosintel>			https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
 					<tor_exits>				https://iplists.firehol.org/files/tor_exits.ipset  {1}"
 blacklist_ip=""
@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.01k"
+version="2.02"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -444,7 +444,13 @@ load_Whitelist() {
 	url="http://www.internic.net/domain/named.root"
 	temp="$dir_temp/named.root"; touch "$temp"
 	cache="$dir_cache/named.root"
-	if http_code=$(curl -sf --location --user-agent "$useragent" --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache") && [ "$http_code" = "200" ]; then
+
+	http_code=$(curl -sf --location --user-agent "$useragent" \
+		--connect-timeout 10 --max-time 180 --limit-rate "$throttle" \
+		--write-out "%{http_code}" --output "$temp" "$url" \
+		--remote-time --time-cond "$cache"); curl_exit=$?
+
+	if [ $curl_exit -eq 0 ] && [ "$http_code" = "200" ]; then
 		mv -f "$temp" "$cache"
 	fi
 	if [ -f "$cache" ]; then
@@ -494,7 +500,11 @@ load_ASN() {
 		(
 			url="https://ipinfo.io/$asn"
 			temp="$dir_temp/$asn"
-			http_code=$(curl -sf --location --user-agent "$useragent" --connect-timeout 10 --max-time 180 --limit-rate "$throttle"  --output "$temp" --write-out "%{http_code}" "$url"); curl_exit=$?
+
+			http_code=$(curl -sf --location --user-agent "$useragent" \
+				--connect-timeout 10 --max-time 180 --limit-rate "$throttle" \
+				--write-out "%{http_code}" --output "$temp" "$url"); curl_exit=$?
+
 			if [ $curl_exit -eq 0 ]; then
 				filter_IP_CIDR < "$temp" | filter_PrivateIP | awk '!x[$0]++' | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | ipset restore -!
 			elif [ "$http_code" = "429" ]; then
@@ -542,7 +552,6 @@ load_Set() {
 
 compare_Set() {
 	printf " [i] Compare $comment\r"
-	local diff_exit=
 	if cmp -s "$cache" "$temp"; then
 		printf "%$(($(printf "$comment" | wc -m) + 13))s\r"
 		return 0
@@ -557,7 +566,7 @@ compare_Set() {
 			*)				gunzip -c "$temp" 2>/dev/null || cat "$temp";;
 		esac
 	} | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp"
-	diff "$filtered_cache" "$filtered_temp" > "$dir_temp/diff"; diff_exit=$?
+	diff "$filtered_cache" "$filtered_temp" > "$dir_temp/diff"; local diff_exit=$?
 	printf "%$(($(printf "$comment" | wc -m) + 13))s\r"
 	return $diff_exit
 }
@@ -597,7 +606,13 @@ download_Set() {
 		cache="$dir_cache/$setname"
 		filtered_temp="$dir_temp/${setname}_filtered"
 		filtered_cache="$dir_filtered/$setname"
-		http_code=$(curl -sf --location --header "Accept-encoding: gzip" --user-agent "$useragent" --connect-timeout 10 --max-time 180 --limit-rate "$throttle" --output "$temp" --write-out "%{http_code}" "$url" --remote-time --time-cond "$cache"); curl_exit=$?
+
+		http_code=$(curl -sf --location --user-agent "$useragent" \
+			--connect-timeout 10 --max-time 180 --limit-rate "$throttle" \
+			--write-out "%{http_code}" --output "$temp" "$url" \
+			--remote-time --time-cond "$cache" \
+			--header "Accept-encoding: gzip"); curl_exit=$?
+
 		if [ $curl_exit -eq 0 ]; then
 			if [ "$http_code" = "304" ]; then
 				log_Skynet "[i] Fresh $comment"
