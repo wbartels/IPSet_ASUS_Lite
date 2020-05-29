@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.02b"
+version="2.02c"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -529,7 +529,7 @@ load_ASN() {
 
 load_Set() {
 	log_Skynet "[i] Update $comment"
-	if ! ipset list -n "$setname" >/dev/null 2>&1; then
+	if ! ipset -n list "$setname" >/dev/null 2>&1; then
 		ipset create "$setname" hash:net maxelem 524288 comment
 		ipset add Skynet-Master "$setname" comment "$comment"
 	fi
@@ -616,7 +616,7 @@ download_Set() {
 		if [ $curl_exit -eq 0 ]; then
 			if [ "$http_code" = "304" ]; then
 				log_Skynet "[i] Fresh $comment"
-			elif compare_Set; then
+			elif compare_Set && ipset -n list "$setname" >/dev/null 2>&1; then
 				log_Skynet "[!] Redownload $comment"
 				mv -f "$temp" "$cache"
 			else
