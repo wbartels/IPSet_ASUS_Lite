@@ -64,7 +64,7 @@ blacklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.gen
 					<dshield>				https://iplists.firehol.org/files/dshield_1d.netset  {1}
 					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
 					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
-					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
+					<myip>					https://iplists.firehol.org/files/myip.ipset  {4}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
 					<talosintel>			https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.02c"
+version="2.02d"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
