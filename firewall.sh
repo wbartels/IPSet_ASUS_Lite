@@ -64,7 +64,7 @@ blacklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.gen
 					<dshield>				https://iplists.firehol.org/files/dshield_1d.netset  {1}
 					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
 					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
-					<myip>					https://iplists.firehol.org/files/myip.ipset  {4}
+					<myip>					http://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
 					<talosintel>			https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.02d"
+version="2.03"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -268,34 +268,67 @@ filter_Skynet_Set() {
 }
 
 
-curl_Error() {
-	case "$1" in
-		1)  printf "Unsupported protocol" ;;
-		2)  printf "Failed initialization" ;;
-		3)  printf "URL malformat" ;;
-		4)  printf "Not built in" ;;
-		5)  printf "Couldn't resolve proxy" ;;
-		6)  printf "Couldn't resolve host" ;;
-		7)  printf "Couldn't connect" ;;
-		8)  printf "Weird server reply" ;;
-		9)  printf "Remote access denied" ;;
-		18) printf "Partial file" ;;
-		22) printf "HTTP error" ;;
-		23) printf "Write error" ;;
-		26) printf "Read error" ;;
-		27) printf "Out of memory" ;;
-		28) printf "Connection timed out" ;;
-		33) printf "Range error" ;;
-		35) printf "SSL connect error" ;;
-		36) printf "Bad download resume" ;;
-		47) printf "Too many redirects" ;;
-		52) printf "Empty reply from server" ;;
-		55) printf "Send error" ;;
-		56) printf "Receive error" ;;
-		60) printf "Peer failed verification" ;;
-		61) printf "Bad content encoding" ;;
-		*)  printf "Error $1 returned by curl" ;;
-	esac
+download_Error() {
+	if [ "$2" = "000" ]; then
+		printf "curl ($1) "
+		case "$1" in
+			 1) printf "Unsupported protocol" ;;
+			 2) printf "Failed initialization" ;;
+			 3) printf "URL malformat" ;;
+			 4) printf "Not built in" ;;
+			 5) printf "Couldn't resolve proxy" ;;
+			 6) printf "Couldn't resolve host" ;;
+			 7) printf "Couldn't connect" ;;
+			 8) printf "Weird server reply" ;;
+			 9) printf "Remote access denied" ;;
+			18) printf "Partial file" ;;
+			23) printf "Write error" ;;
+			26) printf "Read error" ;;
+			27) printf "Out of memory" ;;
+			28) printf "Connection timed out" ;;
+			33) printf "Range error" ;;
+			35) printf "SSL connect error" ;;
+			36) printf "Bad download resume" ;;
+			47) printf "Too many redirects" ;;
+			52) printf "Empty reply from server" ;;
+			55) printf "Send error" ;;
+			56) printf "Receive error" ;;
+			60) printf "Peer failed verification" ;;
+			61) printf "Bad content encoding" ;;
+			 *) printf "Error returned by curl" ;;
+		esac
+	else
+		printf "HTTP/$2 "
+		case "$2" in
+			400) printf "Bad request" ;;
+			401) printf "Unauthorized" ;;
+			402) printf "Payment required" ;;
+			403) printf "Forbidden" ;;
+			404) printf "Not found" ;;
+			405) printf "Method not allowed" ;;
+			406) printf "Not acceptable" ;;
+			407) printf "Proxy authentication required" ;;
+			408) printf "Request timeout" ;;
+			409) printf "Conflict" ;;
+			410) printf "Gone" ;;
+			411) printf "Length required" ;;
+			412) printf "Precondition failed" ;;
+			413) printf "Payload too large" ;;
+			414) printf "URI too long" ;;
+			415) printf "Unsupported media type" ;;
+			416) printf "Range not satisfiable" ;;
+			417) printf "Expectation Failed" ;;
+			425) printf "Too early" ;;
+			426) printf "Upgrade required" ;;
+			428) printf "Precondition required" ;;
+			429) printf "Too many requests" ;;
+			431) printf "Request header fields too large" ;;
+			451) printf "Unavailable for legal reasons" ;;
+	4[0-9][0-9]) printf "Client error" ;;
+	5[0-9][0-9]) printf "Server error" ;;
+			  *) printf "HTTP response" ;;
+		esac
+	fi
 }
 
 
@@ -508,11 +541,11 @@ load_ASN() {
 			if [ $curl_exit -eq 0 ]; then
 				filter_IP_CIDR < "$temp" | filter_PrivateIP | awk '!x[$0]++' | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | ipset restore -!
 			elif [ "$http_code" = "429" ]; then
-				log_Skynet "[*] Download error HTTP/429 Too many requests $url"
+				log_Skynet "[*] Download error $(download_Error $curl_exit $http_code) $url"
 				touch "$dir_temp/asn_too_many_requests"
 				rm -f "$dir_reload/asn"
 			else
-				log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $curl_exit) $url"
+				log_Skynet "[*] Download error $(download_Error $curl_exit $http_code) $url"
 				touch "$dir_reload/asn"
 			fi
 			rm -f "$temp"
@@ -625,10 +658,10 @@ download_Set() {
 				mv -f "$filtered_temp" "$filtered_cache"
 			fi
 		elif [ "$http_code" = "429" ]; then
-			log_Skynet "[*] Download error HTTP/429 Too many requests $url"
+			log_Skynet "[*] Download error $(download_Error $curl_exit $http_code) $url"
 			touch "$dir_sleep/$setname"
 		else
-			log_Skynet "[*] Download error HTTP/$http_code $(curl_Error $curl_exit) $url"
+			log_Skynet "[*] Download error $(download_Error $curl_exit $http_code) $url"
 			touch "$dir_reload/$setname"
 		fi
 		rm -f "$temp" "$filtered_temp"
