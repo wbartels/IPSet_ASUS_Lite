@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.03c"
+version="2.03d"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -587,7 +587,7 @@ load_Set() {
 compare_Set() {
 	echo " [i] Compare $comment"
 	if cmp -s "$cache" "$temp"; then
-		printf "%$(($(printf "$comment" | wc -m) + 13))s\r"
+		printf '\033[1A\033[K'
 		return 0
 	fi
 	if [ ! -f "$filtered_cache" ]; then
@@ -647,8 +647,8 @@ download_Set() {
 			--write-out "%{http_code}" --output "$temp" "$url" \
 			--remote-time --time-cond "$cache" \
 			--header "Accept-encoding: gzip"); curl_exit=$?
-
 		printf '\033[1A\033[K'
+
 		if [ $curl_exit -eq 0 ]; then
 			if [ "$http_code" = "304" ]; then
 				log_Skynet "[i] Fresh $comment"
