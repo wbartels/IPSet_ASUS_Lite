@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.03b"
+version="2.03c"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -404,6 +404,7 @@ rand() {
 header() {
 	if [ "$option" = "cru" ]; then return; fi
 	clear
+	printf '\033[?7l'
 	sed -n '2,7s/#//p' "$0"
 	echo " Skynet Lite $version by Willem Bartels"
 	echo " Code is based on Skynet By Adamm"
@@ -584,7 +585,7 @@ load_Set() {
 
 
 compare_Set() {
-	printf " [i] Compare $comment\r"
+	echo " [i] Compare $comment"
 	if cmp -s "$cache" "$temp"; then
 		printf "%$(($(printf "$comment" | wc -m) + 13))s\r"
 		return 0
@@ -600,7 +601,7 @@ compare_Set() {
 		esac
 	} | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp"
 	diff "$filtered_cache" "$filtered_temp" > "$dir_temp/diff"; local diff_exit=$?
-	printf "%$(($(printf "$comment" | wc -m) + 13))s\r"
+	printf '\033[1A\033[K'
 	return $diff_exit
 }
 
@@ -635,7 +636,7 @@ download_Set() {
 		fi
 		rm -f "$dir_sleep/$setname"
 
-		printf " [i] Download $comment\r"
+		echo " [i] Download $comment"
 		temp="$dir_temp/${setname}_unfiltered"; touch "$temp"
 		cache="$dir_cache/$setname"
 		filtered_temp="$dir_temp/${setname}_filtered"
@@ -647,7 +648,7 @@ download_Set() {
 			--remote-time --time-cond "$cache" \
 			--header "Accept-encoding: gzip"); curl_exit=$?
 
-		printf "%$(($(printf "$comment" | wc -m) + 14))s\r"
+		printf '\033[1A\033[K'
 		if [ $curl_exit -eq 0 ]; then
 			if [ "$http_code" = "304" ]; then
 				log_Skynet "[i] Fresh $comment"
