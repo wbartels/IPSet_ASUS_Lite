@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.04"
+version="2.04b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -708,7 +708,7 @@ download_Set() {
 
 
 i=0
-while [ "$(nvram get ntp_ready)" = "0" ]; do
+while [ "$(nvram get ntp_ready)" = "0" ] && [ "$command" != "uninstall" ]; do
 	if [ $i -eq 0 ]; then log_Skynet "[i] Waiting for NTP to sync..."; fi
 	if [ $i -eq 300 ]; then log_Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!"; echo; exit 1; fi
 	i=$((i + 1)); sleep 1
