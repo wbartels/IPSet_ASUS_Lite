@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.03d"
+version="2.04"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -403,24 +403,23 @@ rand() {
 
 header() {
 	if [ "$option" = "cru" ]; then return; fi
-	clear
-	printf '\033[?7l'
+	clear; printf '\033[?7l' # disable line wrap
 	sed -n '2,7s/#//p' "$0"
 	echo " Skynet Lite $version by Willem Bartels"
 	echo " Code is based on Skynet By Adamm"
 	echo
 	if [ -n "$1" ] || [ -n "$2" ]; then
-		printf "-----------------------------------------------------------\n"
-		printf " %-25s  %30s\n" "$1" "$2"
-		printf "-----------------------------------------------------------\n"
+		printf '%s\n' '-----------------------------------------------------------'
+		printf ' %-25s  %30s\n' "$1" "$2"
+		printf '%s\n' '-----------------------------------------------------------'
 	fi
 }
 
 
 footer() {
 	if [ "$option" = "cru" ]; then return; fi
-	printf "-----------------------------------------------------------\n"
-	printf " %-25s  %30s\n\n" \
+	printf '%s\n' '-----------------------------------------------------------'
+	printf ' %-25s  %30s\n\n' \
 		"Uptime $(formatted_File_Age "$dir_system/installtime")" \
 		"$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed download queued"
 		elif [ $(ls -1 "$dir_sleep" | wc -l) -ge 1 ]; then echo "[i] Download sleep"; fi)"
@@ -572,7 +571,7 @@ load_Set() {
 	awk -v setname="$setname" -v comment="$comment" '{printf "add %s %s comment \"Blacklist: %s\"\n", setname, $1, comment}' "$dir_temp/add" | ipset restore -!
 	awk -v setname="$setname" '{printf "del %s %s\n", setname, $1}' "$dir_temp/del" | ipset restore -!
 	if [ "$debugupdate" = "enabled" ]; then
-		printf "%s | %6s | %7s | %7s |\n" \
+		printf '%s | %6s | %7s | %7s |\n' \
 			"$(date '+%b %d %T')" \
 			"$(wc -l < "$filtered_temp")" \
 			"-$(wc -l < "$dir_temp/del")" \
@@ -587,7 +586,7 @@ load_Set() {
 compare_Set() {
 	echo " [i] Compare $comment"
 	if cmp -s "$cache" "$temp"; then
-		printf '\033[1A\033[K'
+		printf '\033[1A\033[K' # cursor up and erase
 		return 0
 	fi
 	if [ ! -f "$filtered_cache" ]; then
@@ -601,7 +600,7 @@ compare_Set() {
 		esac
 	} | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp"
 	diff "$filtered_cache" "$filtered_temp" > "$dir_temp/diff"; local diff_exit=$?
-	printf '\033[1A\033[K'
+	printf '\033[1A\033[K' # cursor up and erase
 	return $diff_exit
 }
 
@@ -647,7 +646,7 @@ download_Set() {
 			--write-out "%{http_code}" --output "$temp" "$url" \
 			--remote-time --time-cond "$cache" \
 			--header "Accept-encoding: gzip"); curl_exit=$?
-		printf '\033[1A\033[K'
+		printf '\033[1A\033[K' # cursor up and erase
 
 		if [ $curl_exit -eq 0 ]; then
 			if [ "$http_code" = "304" ]; then
@@ -848,7 +847,7 @@ case "$command" in
 
 
 	warning)
-		header
+		header; printf '\033[?7h' # enable line wrap
 		if [ -f "$dir_skynet/warning.log" ] && [ $(wc -l < "$dir_skynet/warning.log") -ge 1 ]; then
 			cat "$dir_skynet/warning.log"
 		else
@@ -859,7 +858,7 @@ case "$command" in
 
 
 	error)
-		header
+		header; printf '\033[?7h' # enable line wrap
 		if [ -f "$dir_skynet/error.log" ] && [ $(wc -l < "$dir_skynet/error.log") -ge 1 ]; then
 			cat "$dir_skynet/error.log"
 		else
