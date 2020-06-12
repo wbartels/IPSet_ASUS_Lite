@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.04b"
+version="2.05"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -249,12 +249,12 @@ filter_ASN() {
 
 filter_Comment() {
 	# https://unix.stackexchange.com/a/205854
-	grep -Eo '<.+>' | tr -d '<>' | tr ',/"' ";_'" | awk '{$1=$1;print}'
+	grep -Eo '<.+>' | tr -d '<>' | tr ',/"' ";_'" | awk '{$1=$1;print}' | grep -E '.+'
 }
 
 
 filter_Update_Cycles() {
-	grep -Eo '\{[1-9][0-9]*\}' | tr -d '{}'
+	grep -Eo '\{[1-9][0-9]*\}' | tr -d '{}' | grep -E '.+'
 }
 
 
@@ -350,10 +350,10 @@ log_Tail() {
 
 
 lookup_Comment_Init() {
-	local comment=$(echo "$whitelist_ip" | filter_Comment); if [ -z "$comment" ]; then comment="whitelist"; fi; echo "Skynet-Whitelist,$comment" > "$dir_temp/lookup.csv"
-	comment=$(echo "$blacklist_ip" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_ip"; fi; echo "Skynet-Blacklist,$comment" >> "$dir_temp/lookup.csv"
-	comment=$(echo "$blacklist_domain" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_domain"; fi; echo "Skynet-Domain,$comment" >> "$dir_temp/lookup.csv"
-	comment=$(echo "$blacklist_asn" | filter_Comment); if [ -z "$comment" ]; then comment="blacklist_asn"; fi; echo "Skynet-ASN,$comment" >> "$dir_temp/lookup.csv"
+ 	echo "Skynet-Whitelist,$(echo "$whitelist_ip" | filter_Comment || echo "whitelist")" > "$dir_temp/lookup.csv"
+ 	echo "Skynet-Blacklist,$(echo "$blacklist_ip" | filter_Comment || echo "blacklist_ip")" >> "$dir_temp/lookup.csv"
+	echo "Skynet-Domain,$(echo "$blacklist_domain" | filter_Comment || echo "blacklist_domain")" >> "$dir_temp/lookup.csv"
+	echo "Skynet-ASN,$(echo "$blacklist_asn" | filter_Comment || echo "blacklist_asn")" >> "$dir_temp/lookup.csv"
 }
 
 
@@ -611,17 +611,11 @@ download_Set() {
 
 	while IFS= read -r line; do
 		url=$(echo "$line" | filter_URL)
-		comment=$(echo "$line" | filter_Comment)
-		update_cycles=$(echo "$line" | filter_Update_Cycles)
+		comment=$(echo "$line" | filter_Comment || echo "<$(basename "$url")>" | filter_Comment)
+		update_cycles=$(echo "$line" | filter_Update_Cycles || echo 4)
 		setname="Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
 
-		if [ -z "$comment" ]; then
-			comment=$(filter_Comment "<$(basename "$url")>")
-		fi
 		echo "$setname,$comment" >> "$dir_temp/lookup.csv"
-		if [ -z "$update_cycles" ]; then
-			update_cycles=4
-		fi
 		if [ -f "$dir_reload/$setname" ] || ! script_Unmodified; then
 			update_cycles=1
 			rm -f "$dir_reload/$setname"
