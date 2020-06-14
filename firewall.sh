@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.05b"
+version="2.05c"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -461,13 +461,12 @@ load_Whitelist() {
 		internic.net
 		ipinfo.io
 		raw.githubusercontent.com
-		dns.adguard.com		dns-family.adguard.com
-		dns.cloudflare.com	one.one.one.one
+		dns.adguard.com
+		dns.cloudflare.com
 		dns.google
 		dns.opendns.com
 		dns.quad9.net
-		ns1.recursive.dnsbycomodo.com
-		ns2.recursive.dnsbycomodo.com
+		one.one.one.one
 		recpubns1.nstld.net
 		recpubns2.nstld.net
 		$(nvram get ntp_server0)
