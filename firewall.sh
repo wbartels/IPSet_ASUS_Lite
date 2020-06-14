@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.05"
+version="2.05b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -461,11 +461,15 @@ load_Whitelist() {
 		internic.net
 		ipinfo.io
 		raw.githubusercontent.com
-		dns.adguard.com
+		dns.adguard.com		dns-family.adguard.com
+		dns.cloudflare.com	one.one.one.one
 		dns.google
 		dns.opendns.com
 		dns.quad9.net
-		one.one.one.one
+		ns1.recursive.dnsbycomodo.com
+		ns2.recursive.dnsbycomodo.com
+		recpubns1.nstld.net
+		recpubns2.nstld.net
 		$(nvram get ntp_server0)
 		$(nvram get ntp_server1)"
 	for domain in $(echo "$whitelist_domain" | filter_Domain | awk '!x[$0]++'); do
@@ -614,8 +618,8 @@ download_Set() {
 		comment=$(echo "$line" | filter_Comment || echo "<$(basename "$url")>" | filter_Comment)
 		update_cycles=$(echo "$line" | filter_Update_Cycles || echo 4)
 		setname="Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
-
 		echo "$setname,$comment" >> "$dir_temp/lookup.csv"
+
 		if [ -f "$dir_reload/$setname" ] || ! script_Unmodified; then
 			update_cycles=1
 			rm -f "$dir_reload/$setname"
