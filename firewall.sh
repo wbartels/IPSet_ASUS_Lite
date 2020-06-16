@@ -64,7 +64,7 @@ blacklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.gen
 					<dshield>				https://iplists.firehol.org/files/dshield_1d.netset  {1}
 					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
 					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
-					<myip>					http://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
+					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
 					<talosintel>			https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.05c"
+version="2.05d"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -589,7 +589,7 @@ load_Set() {
 compare_Set() {
 	echo " [i] Compare $comment"
 	if cmp -s "$cache" "$temp"; then
-		printf '\033[1A\033[K' # cursor up and erase
+		printf '\033[1A\033[K' # cursor up and clear
 		return 0
 	fi
 	if [ ! -f "$filtered_cache" ]; then
@@ -603,7 +603,7 @@ compare_Set() {
 		esac
 	} | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp"
 	diff "$filtered_cache" "$filtered_temp" > "$dir_temp/diff"; local diff_exit=$?
-	printf '\033[1A\033[K' # cursor up and erase
+	printf '\033[1A\033[K' # cursor up and clear
 	return $diff_exit
 }
 
@@ -643,7 +643,7 @@ download_Set() {
 			--write-out "%{http_code}" --output "$temp" "$url" \
 			--remote-time --time-cond "$cache" \
 			--header "Accept-encoding: gzip"); curl_exit=$?
-		printf '\033[1A\033[K' # cursor up and erase
+		printf '\033[1A\033[K' # cursor up and clear
 
 		if [ $curl_exit -eq 0 ]; then
 			if [ "$http_code" = "304" ]; then
@@ -844,7 +844,7 @@ case "$command" in
 
 
 	warning)
-		header; printf '\033[?7h' # enable line wrap
+		header;
 		if [ -f "$dir_skynet/warning.log" ] && [ $(wc -l < "$dir_skynet/warning.log") -ge 1 ]; then
 			cat "$dir_skynet/warning.log"
 		else
@@ -855,7 +855,7 @@ case "$command" in
 
 
 	error)
-		header; printf '\033[?7h' # enable line wrap
+		header;
 		if [ -f "$dir_skynet/error.log" ] && [ $(wc -l < "$dir_skynet/error.log") -ge 1 ]; then
 			cat "$dir_skynet/error.log"
 		else
