@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.05d"
+version="2.06"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -269,7 +269,7 @@ filter_Skynet_Set() {
 
 
 download_Error() {
-	if [ "$2" = "000" ]; then
+	if [ "$1" != "22" ]; then
 		printf "curl ($1) "
 		case "$1" in
 			 1) printf "Unsupported protocol" ;;
@@ -285,7 +285,10 @@ download_Error() {
 			23) printf "Write error" ;;
 			26) printf "Read error" ;;
 			27) printf "Out of memory" ;;
-			28) printf "Connection timed out" ;;
+			28) case "$2" in
+					000) printf "Connection timeout" ;;
+					  *) printf "Operation timeout" ;;
+				esac ;;
 			33) printf "Range error" ;;
 			35) printf "SSL connect error" ;;
 			36) printf "Bad download resume" ;;
@@ -482,7 +485,7 @@ load_Whitelist() {
 	cache="$dir_cache/named.root"
 
 	http_code=$(curl -sf --location --user-agent "$useragent" \
-		--connect-timeout 10 --max-time 180 --limit-rate "$throttle" \
+		--connect-timeout 10 --max-time 90 --limit-rate "$throttle" \
 		--write-out "%{http_code}" --output "$temp" "$url" \
 		--remote-time --time-cond "$cache"); curl_exit=$?
 
@@ -538,7 +541,7 @@ load_ASN() {
 			temp="$dir_temp/$asn"
 
 			http_code=$(curl -sf --location --user-agent "$useragent" \
-				--connect-timeout 10 --max-time 180 --limit-rate "$throttle" \
+				--connect-timeout 10 --max-time 90 --limit-rate "$throttle" \
 				--write-out "%{http_code}" --output "$temp" "$url"); curl_exit=$?
 
 			if [ $curl_exit -eq 0 ]; then
@@ -639,7 +642,7 @@ download_Set() {
 		filtered_cache="$dir_filtered/$setname"
 
 		http_code=$(curl -sf --location --user-agent "$useragent" \
-			--connect-timeout 10 --max-time 180 --limit-rate "$throttle" \
+			--connect-timeout 10 --max-time 90 --limit-rate "$throttle" \
 			--write-out "%{http_code}" --output "$temp" "$url" \
 			--remote-time --time-cond "$cache" \
 			--header "Accept-encoding: gzip"); curl_exit=$?
