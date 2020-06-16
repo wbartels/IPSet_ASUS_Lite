@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.06"
+version="2.06b"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -300,7 +300,7 @@ download_Error() {
 			61) printf "Bad content encoding" ;;
 			 *) printf "Error returned by curl" ;;
 		esac
-	else
+	else # curl (22) HTTP error code >= 400
 		printf "HTTP/$2 "
 		case "$2" in
 			400) printf "Bad request" ;;
@@ -320,7 +320,7 @@ download_Error() {
 			414) printf "URI too long" ;;
 			415) printf "Unsupported media type" ;;
 			416) printf "Range not satisfiable" ;;
-			417) printf "Expectation Failed" ;;
+			417) printf "Expectation failed" ;;
 			425) printf "Too early" ;;
 			426) printf "Upgrade required" ;;
 			428) printf "Precondition required" ;;
@@ -328,8 +328,7 @@ download_Error() {
 			431) printf "Request header fields too large" ;;
 			451) printf "Unavailable for legal reasons" ;;
 	4[0-9][0-9]) printf "Client error" ;;
-	5[0-9][0-9]) printf "Server error" ;;
-			  *) printf "HTTP response" ;;
+			  *) printf "Server error" ;;
 		esac
 	fi
 }
@@ -729,7 +728,7 @@ fi
 
 
 if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
-	throttle="1M"
+	throttle="2M"
 	updatecount=$(update_Counter "$dir_system/updatecount")
 	execution_time=$(($(date +%s) - start_time))
 	if [ $execution_time -ge 0 ] && [ $execution_time -lt 10 ]; then
