@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.06b"
+version="2.07"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -327,8 +327,18 @@ download_Error() {
 			429) printf "Too many requests" ;;
 			431) printf "Request header fields too large" ;;
 			451) printf "Unavailable for legal reasons" ;;
+			500) printf "Internal Server Error" ;;
+			501) printf "Not implemented" ;;
+			502) printf "Bad gateway" ;;
+			503) printf "Service unavailable" ;;
+			504) printf "Gateway timeout" ;;
+			505) printf "HTTP version not supported" ;;
+			506) printf "Variant also negotiates" ;;
+			510) printf "Not extended" ;;
+			511) printf "Network authentication required" ;;
 	4[0-9][0-9]) printf "Client error" ;;
-			  *) printf "Server error" ;;
+	5[0-9][0-9]) printf "Server error" ;;
+			  *) printf "Unknown error" ;;
 		esac
 	fi
 }
