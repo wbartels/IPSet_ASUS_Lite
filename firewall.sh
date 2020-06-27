@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="2.07"
+version="3.0.0"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
