@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.0.0"
+version="3.0.1"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -101,19 +101,6 @@ dir_temp="$dir_skynet/temp"
 dir_update="$dir_skynet/update"
 mkdir -p "$dir_cache" "$dir_debug" "$dir_filtered" "$dir_reload"
 mkdir -p "$dir_sleep" "$dir_system" "$dir_temp" "$dir_update"
-
-
-if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
-	command="reset"
-	option=""
-fi
-
-
-if [ "$(nvram get wan0_proto)" = "pppoe" ]; then
-	iface="ppp0"
-else
-	iface="$(nvram get wan0_ifname)"
-fi
 
 
 ###############
@@ -186,17 +173,12 @@ load_LogIPTables() {
 
 unload_IPSets() {
 	ipset -q destroy Skynet-Master
-	ipset -q destroy Skynet-Blacklist
-	ipset -q destroy Skynet-Domain
-	ipset -q destroy Skynet-ASN
-	ipset -q destroy Skynet-Temp
-	ipset -q destroy Skynet-Whitelist
-	ipset -n list | filter_Skynet_Set | xargs -I setname ipset -q destroy setname
+	ipset -n list | filter_Skynet | xargs -I setname ipset -q destroy setname
 }
 
 
 lookup_Domain() {
-	set -o pipefail; nslookup "$1" 2>/dev/null | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk 'NR>2'
+	set -o pipefail; nslookup "$1" 2>/dev/null | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk 'NR > 2'
 	if [ $? -ne 0 ]; then log_Skynet "[*] nslookup can't resolve $1"; fi
 }
 
@@ -248,8 +230,7 @@ filter_ASN() {
 
 
 filter_Comment() {
-	# https://unix.stackexchange.com/a/205854
-	grep -Eo '<.+>' | tr -d '<>' | tr ',/"' ";_'" | awk '{$1=$1;print}' | grep -E '.+'
+	grep -Eo '<.+>' | tr -d '<>' | tr ',/"' ";_'" | awk '{$1 = $1; print}' | grep -E '.+'
 }
 
 
@@ -716,8 +697,22 @@ download_Set() {
 ############################
 
 
+ip=$(echo "$command" | is_IP) && command="ip"
+if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
+	command="reset"
+	option=""
+fi
+
+
+if [ "$(nvram get wan0_proto)" = "pppoe" ]; then
+	iface="ppp0"
+else
+	iface="$(nvram get wan0_ifname)"
+fi
+
+
 i=0
-while [ "$(nvram get ntp_ready)" = "0" ] && [ "$command" != "uninstall" ]; do
+while [ "$(nvram get ntp_ready)" != "1" ] && [ "$command" != "uninstall" ]; do
 	if [ $i -eq 0 ]; then log_Skynet "[i] Waiting for NTP to sync..."; fi
 	if [ $i -eq 300 ]; then log_Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!"; echo; exit 1; fi
 	i=$((i + 1)); sleep 1
@@ -762,7 +757,6 @@ unset i execution_time
 #######################
 
 
-ip=$(echo "$command" | is_IP) && command="ip"
 case "$command" in
 	reset)
 		header "Reset"
@@ -787,7 +781,7 @@ case "$command" in
 		fi
 		rand=$(rand 1 14)
 		cru d Skynet_update
-		cru a Skynet_update "$((rand)),$((rand + 15)),$((rand + 30)),$((rand + 45)) * * * * nice -n 19 sh /jffs/scripts/firewall update cru"
+		cru a Skynet_update "$((rand + 0)),$((rand + 15)),$((rand + 30)),$((rand + 45)) * * * * nice -n 19 sh /jffs/scripts/firewall update cru"
 		unload_IPTables
 		unload_LogIPTables
 		unload_IPSets
