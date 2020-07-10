@@ -56,7 +56,7 @@ loginvalid="disabled"	# enabled | disabled
 debugupdate="enabled"	# enabled | disabled
 
 
-blacklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.generic  {4}
+blacklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.generic  {8}
 					<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
 					<blocklist.de>			https://iplists.firehol.org/files/blocklist_de.ipset  {1}
 					<blocklist.net.ua>		https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.0.1"
+version="3.0.2"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -416,6 +416,7 @@ footer() {
 		"Uptime $(formatted_File_Age "$dir_system/installtime")" \
 		"$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed download queued"
 		elif [ $(ls -1 "$dir_sleep" | wc -l) -ge 1 ]; then echo "[i] Download sleep"; fi)"
+	printf '\033[?7h' # enable line wrap
 }
 
 
@@ -832,7 +833,8 @@ case "$command" in
 		unload_IPSets
 		rm -fr "$dir_skynet"
 		rm -f "$lockfile" "$0"
-		echo " [i] Skynet Lite has been successfully uninstalled"; echo; exit 0
+		echo " [i] Skynet Lite has been successfully uninstalled"
+		printf '\033[?7h\n'; exit 0
 	;;
 
 
@@ -856,7 +858,7 @@ case "$command" in
 		else
 			echo "Empty warning.log"
 		fi
-		echo
+		printf '\033[?7h\n'
 	;;
 
 
@@ -867,7 +869,7 @@ case "$command" in
 		else
 			echo "Empty error.log"
 		fi
-		echo
+		printf '\033[?7h\n'
 	;;
 
 
