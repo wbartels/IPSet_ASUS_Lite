@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.0.2"
+version="3.0.3"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -396,8 +396,8 @@ rand() {
 
 header() {
 	if [ "$option" = "cru" ]; then return; fi
-	clear; printf '\033[?7l' # disable line wrap
-	sed -n '2,7s/#//p' "$0"
+	printf '\033[?7l' # disable line wrap
+	clear; sed -n '2,7s/#//p' "$0"
 	echo " Skynet Lite $version by Willem Bartels"
 	echo " Code is based on Skynet By Adamm"
 	echo
@@ -411,12 +411,14 @@ header() {
 
 footer() {
 	if [ "$option" = "cru" ]; then return; fi
-	printf '%s\n' '-----------------------------------------------------------'
-	printf ' %-25s  %30s\n\n' \
-		"Uptime $(formatted_File_Age "$dir_system/installtime")" \
-		"$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed download queued"
-		elif [ $(ls -1 "$dir_sleep" | wc -l) -ge 1 ]; then echo "[i] Download sleep"; fi)"
-	printf '\033[?7h' # enable line wrap
+	if [ "$1" != "empty" ]; then
+		printf '%s\n' '-----------------------------------------------------------'
+		printf ' %-25s  %30s\n' \
+			"Uptime $(formatted_File_Age "$dir_system/installtime")" \
+			"$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed download queued"
+			elif [ $(ls -1 "$dir_sleep" | wc -l) -ge 1 ]; then echo "[i] Download sleep"; fi)"
+	fi
+	printf '\033[?7h\n' # enable line wrap
 }
 
 
@@ -834,7 +836,7 @@ case "$command" in
 		rm -fr "$dir_skynet"
 		rm -f "$lockfile" "$0"
 		echo " [i] Skynet Lite has been successfully uninstalled"
-		printf '\033[?7h\n'; exit 0
+		footer "empty"; exit 0
 	;;
 
 
@@ -856,9 +858,9 @@ case "$command" in
 		if [ -f "$dir_skynet/warning.log" ] && [ $(wc -l < "$dir_skynet/warning.log") -ge 1 ]; then
 			cat "$dir_skynet/warning.log"
 		else
-			echo "Empty warning.log"
+			echo " [i] Empty warning.log"
 		fi
-		printf '\033[?7h\n'
+		footer "empty"
 	;;
 
 
@@ -867,9 +869,9 @@ case "$command" in
 		if [ -f "$dir_skynet/error.log" ] && [ $(wc -l < "$dir_skynet/error.log") -ge 1 ]; then
 			cat "$dir_skynet/error.log"
 		else
-			echo "Empty error.log"
+			echo " [i] Empty error.log"
 		fi
-		printf '\033[?7h\n'
+		footer "empty"
 	;;
 
 
