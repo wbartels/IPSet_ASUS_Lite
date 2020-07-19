@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.0.3"
+version="3.0.4"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -376,9 +376,15 @@ file_Age() {
 }
 
 
-script_Unmodified() {
-	if [ "$1" = "timestamp" ]; then date +%s -r '/jffs/scripts/firewall' > "$dir_system/firewall_timestamp"; return; fi
-	[ "$(date +%s -r '/jffs/scripts/firewall')" = "$(head -1 "$dir_system/firewall_timestamp" 2>/dev/null)" ]
+hash_Set() {
+	local data="$version $1" file="$dir_system/$2.md5"
+	echo -n "$data" | md5sum | cut -c1-32 > "$file"
+}
+
+
+hash_Unmodified() {
+	local data="$version $1" file="$dir_system/$2.md5"
+	[ "$(echo -n "$data" | md5sum | cut -c1-32)" = "$(head -1 "$file" 2>/dev/null)" ]
 }
 
 
@@ -423,13 +429,7 @@ footer() {
 
 
 load_Whitelist() {
-	if [ $((updatecount % 48)) -ne 0 ]; then return; fi
-	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Whitelist')"
-	local cache= curl_exit= domain= http_code= n=0 temp= url=
-	ipset -q destroy "Skynet-Temp"
-	ipset create Skynet-Temp hash:net comment
-	# Whitelist router and reserved IP addresses:
-	echo "add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Whitelist: wan0_ipaddr\"
+	local whitelist_router="add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Whitelist: wan0_ipaddr\"
 		add Skynet-Temp $(nvram get wan0_realip_ip) comment \"Whitelist: wan0_realip_ip\"
 		add Skynet-Temp $(nvram get wan0_gateway) comment \"Whitelist: wan0_gateway\"
 		add Skynet-Temp $(nvram get wan0_xgateway) comment \"Whitelist: wan0_xgateway\"
@@ -449,11 +449,8 @@ load_Whitelist() {
 		add Skynet-Temp 198.18.0.0/15 comment \"Whitelist: Network interconnect device benchmark testing\"
 		add Skynet-Temp 198.51.100.0/24 comment \"Whitelist: TEST-NET-2\"
 		add Skynet-Temp 203.0.113.0/24 comment \"Whitelist: TEST-NET-3\"
-		add Skynet-Temp 224.0.0.0/3 comment \"Whitelist: Multicast/reserved/limited broadcast\"" | tr -d '\t' | filter_IP_Line | ipset restore -!
-	# Whitelist ip:
-	echo "$whitelist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' | ipset restore -!
-	# Whitelist domain:
-	whitelist_domain="$whitelist_domain $(echo "$blacklist_set $(nvram get firmware_server)" | strip_Domain)
+		add Skynet-Temp 224.0.0.0/3 comment \"Whitelist: Multicast/reserved/limited broadcast\""
+	local whitelist_domain="$whitelist_domain $(echo "$blacklist_set $(nvram get firmware_server)" | strip_Domain)
 		internic.net
 		ipinfo.io
 		raw.githubusercontent.com
@@ -467,6 +464,17 @@ load_Whitelist() {
 		recpubns2.nstld.net
 		$(nvram get ntp_server0)
 		$(nvram get ntp_server1)"
+
+	if [ $((updatecount % 48)) -ne 0 ] && hash_Unmodified "$whitelist_router $whitelist_ip $whitelist_domain" "whitelist"; then return; fi
+	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Whitelist')"
+	local cache= curl_exit= domain= http_code= n=0 temp= url=
+	ipset -q destroy "Skynet-Temp"
+	ipset create Skynet-Temp hash:net comment
+	# Whitelist router and reserved IP addresses:
+	echo "$whitelist_router" | tr -d '\t' | filter_IP_Line | ipset restore -!
+	# Whitelist ip:
+	echo "$whitelist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' | ipset restore -!
+	# Whitelist domain:
 	for domain in $(echo "$whitelist_domain" | filter_Domain | awk '!x[$0]++'); do
 		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' | ipset restore -! &
 		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
@@ -491,22 +499,24 @@ load_Whitelist() {
 	rm -f "$temp";
 	ipset swap "Skynet-Whitelist" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
+	hash_Set "$whitelist_router $whitelist_ip $whitelist_domain" "whitelist"
 }
 
 
 load_Blacklist() {
-	if script_Unmodified; then return; fi
+	if hash_Unmodified "$blacklist_ip" "blacklist_ip"; then return; fi
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Blacklist')"
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net comment
 	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' | ipset restore -!
 	ipset swap "Skynet-Blacklist" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
+	hash_Set "$blacklist_ip" "blacklist_ip"
 }
 
 
 load_Domain() {
-	if [ $((updatecount % 48)) -ne 0 ]; then return; fi
+	if [ $((updatecount % 48)) -ne 0 ] && hash_Unmodified "$blacklist_domain" "blacklist_domain"; then return; fi
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Domain')"
 	local domain= n=0
 	ipset -q destroy "Skynet-Temp"
@@ -518,11 +528,12 @@ load_Domain() {
 	wait
 	ipset swap "Skynet-Domain" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
+	hash_Set "$blacklist_domain" "blacklist_domain"
 }
 
 
 load_ASN() {
-	if [ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ]; then return; fi
+	if [ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ] && hash_Unmodified "$blacklist_asn" "blacklist_asn"; then return; fi
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-ASN')"
 	local asn= n=0
 	rm -f "$dir_reload/asn"
@@ -556,6 +567,7 @@ load_ASN() {
 	if [ -f "$dir_reload/asn" ] || [ -f "$dir_temp/asn_too_many_requests" ]; then ipset destroy "Skynet-Temp"; return; fi
 	ipset swap "Skynet-ASN" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
+	hash_Set "$blacklist_asn" "blacklist_asn"
 }
 
 
@@ -615,17 +627,14 @@ download_Set() {
 		setname="Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
 		echo "$setname,$comment" >> "$dir_temp/lookup.csv"
 
-		if [ -f "$dir_reload/$setname" ] || ! script_Unmodified; then
-			update_cycles=1
-			rm -f "$dir_reload/$setname"
-		fi
-		if [ $((updatecount % update_cycles)) -ne 0 ]; then
+		if [ $((updatecount % update_cycles)) -ne 0 ] && [ ! -f "$dir_reload/$setname" ]; then
 			continue
 		fi
 		if [ -f "$dir_sleep/$setname" ] && [ $(file_Age "$dir_sleep/$setname") -lt 14400 ]; then
 			log_Skynet "[!] Sleep $(formatted_Time $((14400 - $(file_Age "$dir_sleep/$setname")))) $comment"
 			continue
 		fi
+		rm -f "$dir_reload/$setname"
 		rm -f "$dir_sleep/$setname"
 
 		echo " [i] Download $comment"
@@ -663,8 +672,7 @@ download_Set() {
 	done < "$dir_temp/blacklist_set"
 	sort -t, -k2 < "$dir_temp/lookup.csv" > "$dir_system/lookup.csv"
 
-	if script_Unmodified; then return; fi
-
+	if hash_Unmodified "$blacklist_set" "blacklist_set"; then return; fi
 	# Unload unlisted sets
 	list=$(filter_Skynet_Set < "$dir_system/lookup.csv" | awk -F, '{print $1}')
 	for setname in $(ipset list Skynet-Master | filter_Skynet_Set | awk '{print $1}'); do
@@ -673,7 +681,6 @@ download_Set() {
 			ipset -q destroy "$setname"
 		fi
 	done
-
 	# Cleanup directories
 	for dir in "$dir_cache" "$dir_filtered" "$dir_reload" "$dir_sleep" "$dir_update"; do
 		cd "$dir"
@@ -683,7 +690,6 @@ download_Set() {
 			fi
 		done
 	done
-
 	# Cleanup debug directory
 	list=$(filter_Skynet_Set < "$dir_system/lookup.csv" | awk -F, '{print $2 ".log"}')
 	cd "$dir_debug"
@@ -692,6 +698,7 @@ download_Set() {
 			rm -f "$dir_debug/$comment"
 		fi
 	done
+	hash_Set "$blacklist_set" "blacklist_set"
 }
 
 
@@ -803,7 +810,6 @@ case "$command" in
 		load_Domain
 		load_ASN
 		download_Set
-		script_Unmodified "timestamp"
 		footer
 	;;
 
@@ -816,7 +822,6 @@ case "$command" in
 		load_Domain
 		load_ASN
 		download_Set
-		script_Unmodified "timestamp"
 		footer
 	;;
 
@@ -854,7 +859,7 @@ case "$command" in
 
 
 	warning)
-		header;
+		header
 		if [ -f "$dir_skynet/warning.log" ] && [ $(wc -l < "$dir_skynet/warning.log") -ge 1 ]; then
 			cat "$dir_skynet/warning.log"
 		else
@@ -865,7 +870,7 @@ case "$command" in
 
 
 	error)
-		header;
+		header
 		if [ -f "$dir_skynet/error.log" ] && [ $(wc -l < "$dir_skynet/error.log") -ge 1 ]; then
 			cat "$dir_skynet/error.log"
 		else
