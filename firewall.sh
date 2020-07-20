@@ -41,7 +41,7 @@
 #
 # The other lists (ip, domain and asn) can contain multiple items per list.
 # The items on these lists must be separated with a space, tab or newline.
-# blacklist_ip, blacklist_domain, blacklist_asn and whitelist_ip can optional use one <comment> tag per list.
+# blocklist_ip, blocklist_domain, blocklist_asn and passlist_ip can optional use one <comment> tag per list.
 #
 
 
@@ -56,7 +56,7 @@ loginvalid="disabled"	# enabled | disabled
 debugupdate="enabled"	# enabled | disabled
 
 
-blacklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.generic  {8}
+blocklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.generic  {8}
 					<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
 					<blocklist.de>			https://iplists.firehol.org/files/blocklist_de.ipset  {1}
 					<blocklist.net.ua>		https://iplists.firehol.org/files/blocklist_net_ua.ipset  {1}
@@ -69,11 +69,11 @@ blacklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.gen
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
 					<talosintel>			https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
 					<tor_exits>				https://iplists.firehol.org/files/tor_exits.ipset  {1}"
-blacklist_ip=""
-blacklist_domain=""
-blacklist_asn=""
-whitelist_ip=""
-whitelist_domain=""
+blocklist_ip=""
+blocklist_domain=""
+blocklist_asn=""
+passlist_ip=""
+passlist_domain=""
 
 
 ##########################
@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.0.4"
+version="3.0.5"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -109,10 +109,10 @@ mkdir -p "$dir_sleep" "$dir_system" "$dir_temp" "$dir_update"
 
 
 unload_IPTables() {
-	iptables -t raw -D PREROUTING -i "$iface" -m set ! --match-set Skynet-Whitelist src -m set --match-set Skynet-Master src -j DROP 2>/dev/null
-	iptables -t raw -D PREROUTING -i br0 -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j DROP 2>/dev/null
-	iptables -t raw -D OUTPUT -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j DROP 2>/dev/null
-	iptables -D SSHBFP -m recent --update --seconds 60 --hitcount 4 --name SSH --rsource -j SET --add-set Skynet-Blacklist src 2>/dev/null
+	iptables -t raw -D PREROUTING -i "$iface" -m set ! --match-set Skynet-Passlist src -m set --match-set Skynet-Primary src -j DROP 2>/dev/null
+	iptables -t raw -D PREROUTING -i br0 -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j DROP 2>/dev/null
+	iptables -t raw -D OUTPUT -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j DROP 2>/dev/null
+	iptables -D SSHBFP -m recent --update --seconds 60 --hitcount 4 --name SSH --rsource -j SET --add-set Skynet-Blocklist src 2>/dev/null
 	iptables -D SSHBFP -m recent --update --seconds 60 --hitcount 4 --name SSH --rsource -j LOG --log-prefix "[BLOCKED - NEW BAN] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 	iptables -D logdrop -m state --state NEW -j LOG --log-prefix "DROP " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 	ip6tables -D logdrop -m state --state NEW -j LOG --log-prefix "DROP " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
@@ -124,24 +124,24 @@ unload_IPTables() {
 load_IPTables() {
 	local pos1=
 	if [ "$filtertraffic" = "all" ] || [ "$filtertraffic" = "inbound" ]; then
-		iptables -t raw -I PREROUTING -i "$iface" -m set ! --match-set Skynet-Whitelist src -m set --match-set Skynet-Master src -j DROP 2>/dev/null
+		iptables -t raw -I PREROUTING -i "$iface" -m set ! --match-set Skynet-Passlist src -m set --match-set Skynet-Primary src -j DROP 2>/dev/null
 	fi
 	if [ "$filtertraffic" = "all" ] || [ "$filtertraffic" = "outbound" ]; then
-		iptables -t raw -I PREROUTING -i br0 -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j DROP 2>/dev/null
-		iptables -t raw -I OUTPUT -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j DROP 2>/dev/null
+		iptables -t raw -I PREROUTING -i br0 -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j DROP 2>/dev/null
+		iptables -t raw -I OUTPUT -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j DROP 2>/dev/null
 	fi
 	if [ "$(nvram get sshd_enable)" = "1" ] && [ "$(nvram get sshd_bfp)" = "1" ] && [ "$(uname -o)" = "ASUSWRT-Merlin" ] && [ "$(nvram get switch_wantag)" != "movistar" ]; then
 		pos1="$(iptables --line -nL SSHBFP | grep -F "seconds: 60 hit_count: 4" | grep -E 'DROP|logdrop' | awk '{print $1}')"
-		iptables -I SSHBFP "$pos1" -m recent --update --seconds 60 --hitcount 4 --name SSH --rsource -j SET --add-set Skynet-Blacklist src 2>/dev/null
+		iptables -I SSHBFP "$pos1" -m recent --update --seconds 60 --hitcount 4 --name SSH --rsource -j SET --add-set Skynet-Blocklist src 2>/dev/null
 		iptables -I SSHBFP "$pos1" -m recent --update --seconds 60 --hitcount 4 --name SSH --rsource -j LOG --log-prefix "[BLOCKED - NEW BAN] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 	fi
 }
 
 
 unload_LogIPTables() {
-	iptables -t raw -D PREROUTING -i "$iface" -m set ! --match-set Skynet-Whitelist src -m set --match-set Skynet-Master src -j LOG --log-prefix "[BLOCKED - INBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
-	iptables -t raw -D PREROUTING -i br0 -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
-	iptables -t raw -D OUTPUT -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+	iptables -t raw -D PREROUTING -i "$iface" -m set ! --match-set Skynet-Passlist src -m set --match-set Skynet-Primary src -j LOG --log-prefix "[BLOCKED - INBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+	iptables -t raw -D PREROUTING -i br0 -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+	iptables -t raw -D OUTPUT -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 	iptables -D logdrop -m state --state NEW -j LOG --log-prefix "[BLOCKED - INVALID] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 	iptables -D FORWARD -i br0 -m set --match-set Skynet-IOT src ! -o tun2+ -j LOG --log-prefix "[BLOCKED - IOT] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 }
@@ -151,14 +151,14 @@ load_LogIPTables() {
 	local pos2= pos3= pos4= pos5=
 	if [ "$logmode" = "enabled" ]; then
 		if [ "$filtertraffic" = "all" ] || [ "$filtertraffic" = "inbound" ]; then
-			pos2="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Master src" | grep -F "DROP" | awk '{print $1}')"
-			iptables -t raw -I PREROUTING "$pos2" -i "$iface" -m set ! --match-set Skynet-Whitelist src -m set --match-set Skynet-Master src -j LOG --log-prefix "[BLOCKED - INBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+			pos2="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Primary src" | grep -F "DROP" | awk '{print $1}')"
+			iptables -t raw -I PREROUTING "$pos2" -i "$iface" -m set ! --match-set Skynet-Passlist src -m set --match-set Skynet-Primary src -j LOG --log-prefix "[BLOCKED - INBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 		fi
 		if [ "$filtertraffic" = "all" ] || [ "$filtertraffic" = "outbound" ]; then
-			pos3="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Master dst" | grep -F "DROP" | awk '{print $1}')"
-			iptables -t raw -I PREROUTING "$pos3" -i br0 -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
-			pos4="$(iptables --line -nL OUTPUT -t raw | grep -F "Skynet-Master dst" | grep -F "DROP" | awk '{print $1}')"
-			iptables -t raw -I OUTPUT "$pos4" -m set ! --match-set Skynet-Whitelist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+			pos3="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Primary dst" | grep -F "DROP" | awk '{print $1}')"
+			iptables -t raw -I PREROUTING "$pos3" -i br0 -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+			pos4="$(iptables --line -nL OUTPUT -t raw | grep -F "Skynet-Primary dst" | grep -F "DROP" | awk '{print $1}')"
+			iptables -t raw -I OUTPUT "$pos4" -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 		fi
 		if [ "$(nvram get fw_log_x)" = "drop" ] || [ "$(nvram get fw_log_x)" = "both" ] && [ "$loginvalid" = "enabled" ]; then
 			iptables -I logdrop -m state --state NEW -j LOG --log-prefix "[BLOCKED - INVALID] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
@@ -172,7 +172,7 @@ load_LogIPTables() {
 
 
 unload_IPSets() {
-	ipset -q destroy Skynet-Master
+	ipset -q destroy Skynet-Primary
 	ipset -n list | filter_Skynet | xargs -I setname ipset -q destroy setname
 }
 
@@ -343,10 +343,10 @@ log_Tail() {
 
 
 lookup_Comment_Init() {
- 	echo "Skynet-Whitelist,$(echo "$whitelist_ip" | filter_Comment || echo "whitelist")" > "$dir_temp/lookup.csv"
- 	echo "Skynet-Blacklist,$(echo "$blacklist_ip" | filter_Comment || echo "blacklist_ip")" >> "$dir_temp/lookup.csv"
-	echo "Skynet-Domain,$(echo "$blacklist_domain" | filter_Comment || echo "blacklist_domain")" >> "$dir_temp/lookup.csv"
-	echo "Skynet-ASN,$(echo "$blacklist_asn" | filter_Comment || echo "blacklist_asn")" >> "$dir_temp/lookup.csv"
+ 	echo "Skynet-Passlist,$(echo "$passlist_ip" | filter_Comment || echo "passlist")" > "$dir_temp/lookup.csv"
+ 	echo "Skynet-Blocklist,$(echo "$blocklist_ip" | filter_Comment || echo "blocklist_ip")" >> "$dir_temp/lookup.csv"
+	echo "Skynet-Domain,$(echo "$blocklist_domain" | filter_Comment || echo "blocklist_domain")" >> "$dir_temp/lookup.csv"
+	echo "Skynet-ASN,$(echo "$blocklist_asn" | filter_Comment || echo "blocklist_asn")" >> "$dir_temp/lookup.csv"
 }
 
 
@@ -428,29 +428,29 @@ footer() {
 }
 
 
-load_Whitelist() {
-	local whitelist_router="add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Whitelist: wan0_ipaddr\"
-		add Skynet-Temp $(nvram get wan0_realip_ip) comment \"Whitelist: wan0_realip_ip\"
-		add Skynet-Temp $(nvram get wan0_gateway) comment \"Whitelist: wan0_gateway\"
-		add Skynet-Temp $(nvram get wan0_xgateway) comment \"Whitelist: wan0_xgateway\"
-		add Skynet-Temp $(nvram get wan0_dns | awk '{print $1}') comment \"Whitelist: wan0_dns\"
-		add Skynet-Temp $(nvram get wan0_dns | awk '{print $2}') comment \"Whitelist: wan0_dns\"
-		add Skynet-Temp $(nvram get dhcp_dns1_x) comment \"Whitelist: dhcp_dns1_x\"
-		add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Whitelist: dhcp_dns2_x\"
-		add Skynet-Temp 0.0.0.0/8 comment \"Whitelist: This network\"
-		add Skynet-Temp 10.0.0.0/8 comment \"Whitelist: Private network\"
-		add Skynet-Temp 100.64.0.0/10 comment \"Whitelist: Carrier-grade NAT\"
-		add Skynet-Temp 127.0.0.0/8 comment \"Whitelist: Loopback\"
-		add Skynet-Temp 169.254.0.0/16 comment \"Whitelist: Link local\"
-		add Skynet-Temp 172.16.0.0/12 comment \"Whitelist: Private network\"
-		add Skynet-Temp 192.0.0.0/24 comment \"Whitelist: IETF protocol assignments\"
-		add Skynet-Temp 192.0.2.0/24 comment \"Whitelist: TEST-NET-1\"
-		add Skynet-Temp 192.168.0.0/16 comment \"Whitelist: Private network\"
-		add Skynet-Temp 198.18.0.0/15 comment \"Whitelist: Network interconnect device benchmark testing\"
-		add Skynet-Temp 198.51.100.0/24 comment \"Whitelist: TEST-NET-2\"
-		add Skynet-Temp 203.0.113.0/24 comment \"Whitelist: TEST-NET-3\"
-		add Skynet-Temp 224.0.0.0/3 comment \"Whitelist: Multicast/reserved/limited broadcast\""
-	local whitelist_domain="$whitelist_domain $(echo "$blacklist_set $(nvram get firmware_server)" | strip_Domain)
+load_Passlist() {
+	local passlist_router="add Skynet-Temp $(nvram get wan0_ipaddr) comment \"Passlist: wan0_ipaddr\"
+		add Skynet-Temp $(nvram get wan0_realip_ip) comment \"Passlist: wan0_realip_ip\"
+		add Skynet-Temp $(nvram get wan0_gateway) comment \"Passlist: wan0_gateway\"
+		add Skynet-Temp $(nvram get wan0_xgateway) comment \"Passlist: wan0_xgateway\"
+		add Skynet-Temp $(nvram get wan0_dns | awk '{print $1}') comment \"Passlist: wan0_dns\"
+		add Skynet-Temp $(nvram get wan0_dns | awk '{print $2}') comment \"Passlist: wan0_dns\"
+		add Skynet-Temp $(nvram get dhcp_dns1_x) comment \"Passlist: dhcp_dns1_x\"
+		add Skynet-Temp $(nvram get dhcp_dns2_x) comment \"Passlist: dhcp_dns2_x\"
+		add Skynet-Temp 0.0.0.0/8 comment \"Passlist: This network\"
+		add Skynet-Temp 10.0.0.0/8 comment \"Passlist: Private network\"
+		add Skynet-Temp 100.64.0.0/10 comment \"Passlist: Carrier-grade NAT\"
+		add Skynet-Temp 127.0.0.0/8 comment \"Passlist: Loopback\"
+		add Skynet-Temp 169.254.0.0/16 comment \"Passlist: Link local\"
+		add Skynet-Temp 172.16.0.0/12 comment \"Passlist: Private network\"
+		add Skynet-Temp 192.0.0.0/24 comment \"Passlist: IETF protocol assignments\"
+		add Skynet-Temp 192.0.2.0/24 comment \"Passlist: TEST-NET-1\"
+		add Skynet-Temp 192.168.0.0/16 comment \"Passlist: Private network\"
+		add Skynet-Temp 198.18.0.0/15 comment \"Passlist: Network interconnect device benchmark testing\"
+		add Skynet-Temp 198.51.100.0/24 comment \"Passlist: TEST-NET-2\"
+		add Skynet-Temp 203.0.113.0/24 comment \"Passlist: TEST-NET-3\"
+		add Skynet-Temp 224.0.0.0/3 comment \"Passlist: Multicast/reserved/limited broadcast\""
+	local passlist_domain="$passlist_domain $(echo "$blocklist_set $(nvram get firmware_server)" | strip_Domain)
 		internic.net
 		ipinfo.io
 		raw.githubusercontent.com
@@ -465,22 +465,22 @@ load_Whitelist() {
 		$(nvram get ntp_server0)
 		$(nvram get ntp_server1)"
 
-	if [ $((updatecount % 48)) -ne 0 ] && hash_Unmodified "$whitelist_router $whitelist_ip $whitelist_domain" "whitelist"; then return; fi
-	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Whitelist')"
+	if [ $((updatecount % 48)) -ne 0 ] && hash_Unmodified "$passlist_router $passlist_ip $passlist_domain" "passlist"; then return; fi
+	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Passlist')"
 	local cache= curl_exit= domain= http_code= n=0 temp= url=
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net comment
-	# Whitelist router and reserved IP addresses:
-	echo "$whitelist_router" | tr -d '\t' | filter_IP_Line | ipset restore -!
-	# Whitelist ip:
-	echo "$whitelist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, $1}' | ipset restore -!
-	# Whitelist domain:
-	for domain in $(echo "$whitelist_domain" | filter_Domain | awk '!x[$0]++'); do
-		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Whitelist: %s\"\n", $1, domain}' | ipset restore -! &
+	# Passlist router and reserved IP addresses:
+	echo "$passlist_router" | tr -d '\t' | filter_IP_Line | ipset restore -!
+	# Passlist ip:
+	echo "$passlist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Passlist: %s\"\n", $1, $1}' | ipset restore -!
+	# Passlist domain:
+	for domain in $(echo "$passlist_domain" | filter_Domain | awk '!x[$0]++'); do
+		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Passlist: %s\"\n", $1, domain}' | ipset restore -! &
 		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
 	done
 	wait
-	# Whitelist root hints:
+	# Passlist root hints:
 	url="http://www.internic.net/domain/named.root"
 	temp="$dir_temp/named.root"; touch "$temp"
 	cache="$dir_cache/named.root"
@@ -494,52 +494,52 @@ load_Whitelist() {
 		mv -f "$temp" "$cache"
 	fi
 	if [ -f "$cache" ]; then
-		filter_IP_CIDR < "$cache" | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Whitelist: Root hints\"\n", $1}' | ipset restore -!
+		filter_IP_CIDR < "$cache" | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Passlist: Root hints\"\n", $1}' | ipset restore -!
 	fi
 	rm -f "$temp";
-	ipset swap "Skynet-Whitelist" "Skynet-Temp"
+	ipset swap "Skynet-Passlist" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
-	hash_Set "$whitelist_router $whitelist_ip $whitelist_domain" "whitelist"
+	hash_Set "$passlist_router $passlist_ip $passlist_domain" "passlist"
 }
 
 
-load_Blacklist() {
-	if hash_Unmodified "$blacklist_ip" "blacklist_ip"; then return; fi
-	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Blacklist')"
+load_Blocklist() {
+	if hash_Unmodified "$blocklist_ip" "blocklist_ip"; then return; fi
+	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Blocklist')"
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net comment
-	echo "$blacklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, $1}' | ipset restore -!
-	ipset swap "Skynet-Blacklist" "Skynet-Temp"
+	echo "$blocklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, $1}' | ipset restore -!
+	ipset swap "Skynet-Blocklist" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
-	hash_Set "$blacklist_ip" "blacklist_ip"
+	hash_Set "$blocklist_ip" "blocklist_ip"
 }
 
 
 load_Domain() {
-	if [ $((updatecount % 48)) -ne 0 ] && hash_Unmodified "$blacklist_domain" "blacklist_domain"; then return; fi
+	if [ $((updatecount % 48)) -ne 0 ] && hash_Unmodified "$blocklist_domain" "blocklist_domain"; then return; fi
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Domain')"
 	local domain= n=0
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net comment
-	for domain in $(echo "$blacklist_domain" | filter_Domain); do
-		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, domain}' | ipset restore -! &
+	for domain in $(echo "$blocklist_domain" | filter_Domain); do
+		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, domain}' | ipset restore -! &
 		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
 	done
 	wait
 	ipset swap "Skynet-Domain" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
-	hash_Set "$blacklist_domain" "blacklist_domain"
+	hash_Set "$blocklist_domain" "blocklist_domain"
 }
 
 
 load_ASN() {
-	if [ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ] && hash_Unmodified "$blacklist_asn" "blacklist_asn"; then return; fi
+	if [ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ] && hash_Unmodified "$blocklist_asn" "blocklist_asn"; then return; fi
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-ASN')"
 	local asn= n=0
 	rm -f "$dir_reload/asn"
 	ipset -q destroy "Skynet-Temp"
 	ipset create "Skynet-Temp" hash:net comment
-	for asn in $(echo "$blacklist_asn" | filter_ASN); do
+	for asn in $(echo "$blocklist_asn" | filter_ASN); do
 		(
 			url="https://ipinfo.io/$asn"
 			temp="$dir_temp/$asn"
@@ -549,7 +549,7 @@ load_ASN() {
 				--write-out "%{http_code}" --output "$temp" "$url"); curl_exit=$?
 
 			if [ $curl_exit -eq 0 ]; then
-				filter_IP_CIDR < "$temp" | filter_PrivateIP | awk '!x[$0]++' | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blacklist: %s\"\n", $1, asn}' | ipset restore -!
+				filter_IP_CIDR < "$temp" | filter_PrivateIP | awk '!x[$0]++' | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, asn}' | ipset restore -!
 			elif [ "$http_code" = "429" ]; then
 				log_Skynet "[*] Download error $(download_Error $curl_exit $http_code) $url"
 				touch "$dir_temp/asn_too_many_requests"
@@ -567,7 +567,7 @@ load_ASN() {
 	if [ -f "$dir_reload/asn" ] || [ -f "$dir_temp/asn_too_many_requests" ]; then ipset destroy "Skynet-Temp"; return; fi
 	ipset swap "Skynet-ASN" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
-	hash_Set "$blacklist_asn" "blacklist_asn"
+	hash_Set "$blocklist_asn" "blocklist_asn"
 }
 
 
@@ -575,11 +575,11 @@ load_Set() {
 	log_Skynet "[i] Update $comment"
 	if ! ipset -n list "$setname" >/dev/null 2>&1; then
 		ipset create "$setname" hash:net maxelem 524288 comment
-		ipset add Skynet-Master "$setname" comment "$comment"
+		ipset add Skynet-Primary "$setname" comment "$comment"
 	fi
 	grep -E '^[+][0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/add"
 	grep -E '^[-][0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/del"
-	awk -v setname="$setname" -v comment="$comment" '{printf "add %s %s comment \"Blacklist: %s\"\n", setname, $1, comment}' "$dir_temp/add" | ipset restore -!
+	awk -v setname="$setname" -v comment="$comment" '{printf "add %s %s comment \"Blocklist: %s\"\n", setname, $1, comment}' "$dir_temp/add" | ipset restore -!
 	awk -v setname="$setname" '{printf "del %s %s\n", setname, $1}' "$dir_temp/del" | ipset restore -!
 	if [ "$debugupdate" = "enabled" ]; then
 		printf '%s | %6s | %7s | %7s |\n' \
@@ -618,7 +618,7 @@ compare_Set() {
 
 download_Set() {
 	local cache= comment= curl_exit= dir= filtered_cache= filtered_temp= http_code= line= list= lookup= setname= temp= update_cycles= url=
-	echo "$blacklist_set" | filter_URL_Line > "$dir_temp/blacklist_set"
+	echo "$blocklist_set" | filter_URL_Line > "$dir_temp/blocklist_set"
 
 	while IFS= read -r line; do
 		url=$(echo "$line" | filter_URL)
@@ -669,15 +669,15 @@ download_Set() {
 			touch "$dir_reload/$setname"
 		fi
 		rm -f "$temp" "$filtered_temp"
-	done < "$dir_temp/blacklist_set"
+	done < "$dir_temp/blocklist_set"
 	sort -t, -k2 < "$dir_temp/lookup.csv" > "$dir_system/lookup.csv"
 
-	if hash_Unmodified "$blacklist_set" "blacklist_set"; then return; fi
+	if hash_Unmodified "$blocklist_set" "blocklist_set"; then return; fi
 	# Unload unlisted sets
 	list=$(filter_Skynet_Set < "$dir_system/lookup.csv" | awk -F, '{print $1}')
-	for setname in $(ipset list Skynet-Master | filter_Skynet_Set | awk '{print $1}'); do
+	for setname in $(ipset list Skynet-Primary | filter_Skynet_Set | awk '{print $1}'); do
 		if ! echo "$list" | grep -q "$setname"; then
-			ipset -q del "Skynet-Master" "$setname"
+			ipset -q del "Skynet-Primary" "$setname"
 			ipset -q destroy "$setname"
 		fi
 	done
@@ -698,7 +698,7 @@ download_Set() {
 			rm -f "$dir_debug/$comment"
 		fi
 	done
-	hash_Set "$blacklist_set" "blacklist_set"
+	hash_Set "$blocklist_set" "blocklist_set"
 }
 
 
@@ -708,7 +708,7 @@ download_Set() {
 
 
 ip=$(echo "$command" | is_IP) && command="ip"
-if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
+if ! ipset list -n Skynet-Primary >/dev/null 2>&1; then
 	command="reset"
 	option=""
 fi
@@ -795,18 +795,18 @@ case "$command" in
 		unload_IPTables
 		unload_LogIPTables
 		unload_IPSets
-		echo 'create Skynet-Master list:set size 64 comment counters
-			create Skynet-Blacklist hash:net comment
+		echo 'create Skynet-Primary list:set size 64 comment counters
+			create Skynet-Blocklist hash:net comment
 			create Skynet-Domain hash:net comment
 			create Skynet-ASN hash:net comment
-			create Skynet-Whitelist hash:net comment
-			add Skynet-Master Skynet-Blacklist comment "blacklist_ip"
-			add Skynet-Master Skynet-Domain comment "blacklist_domain"
-			add Skynet-Master Skynet-ASN comment "blacklist_asn"' | tr -d '\t' | ipset restore -!
+			create Skynet-Passlist hash:net comment
+			add Skynet-Primary Skynet-Blocklist comment "blocklist_ip"
+			add Skynet-Primary Skynet-Domain comment "blocklist_domain"
+			add Skynet-Primary Skynet-ASN comment "blocklist_asn"' | tr -d '\t' | ipset restore -!
 		load_IPTables
 		load_LogIPTables
-		load_Whitelist
-		load_Blacklist
+		load_Passlist
+		load_Blocklist
 		load_Domain
 		load_ASN
 		download_Set
@@ -817,8 +817,8 @@ case "$command" in
 	update)
 		header "Update"
 		lookup_Comment_Init
-		load_Whitelist
-		load_Blacklist
+		load_Passlist
+		load_Blocklist
 		load_Domain
 		load_ASN
 		download_Set
@@ -881,7 +881,7 @@ case "$command" in
 
 
 	fresh)
-		header "Blacklist" "Client file age"
+		header "Blocklist" "Client file age"
 		true > "$dir_temp/file.csv"
 		filter_Skynet_Set < "$dir_system/lookup.csv" | while IFS=, read -r setname comment; do
 			age=$(file_Age "$dir_update/$setname")
@@ -893,7 +893,7 @@ case "$command" in
 
 
 	frequency)
-		header "Blacklist" "Average update time"
+		header "Blocklist" "Average update time"
 		true > "$dir_temp/file.csv"
 		filter_Skynet_Set < "$dir_system/lookup.csv" | while IFS=, read -r setname comment; do
 			n=$(head -1 "$dir_update/$setname" 2>/dev/null || echo 1)
@@ -934,9 +934,9 @@ case "$command" in
 
 
 	*)
-		header "Blacklist" "Packets blocked"
+		header "Blocklist" "Packets blocked"
 		true > "$dir_temp/file.csv"
-		ipset list Skynet-Master | filter_Skynet | awk '{print $1 "," $3}' | while IFS=, read -r setname blocked; do
+		ipset list Skynet-Primary | filter_Skynet | awk '{print $1 "," $3}' | while IFS=, read -r setname blocked; do
 			echo "$(lookup_Comment "$setname"),$blocked" >> "$dir_temp/file.csv"
 		done
 		sort -t, -k2nr -k1,1 < "$dir_temp/file.csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
