@@ -59,9 +59,9 @@ debugupdate="enabled"	# enabled | disabled
 blocklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.generic  {8}
 					<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
 					<blocklist.de>			https://iplists.firehol.org/files/blocklist_de.ipset  {1}
+					<bruteforceblocker>		http://danger.rulez.sk/projects/bruteforceblocker/blist.php  {4}
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {1}
-					<et_compromised>		https://rules.emergingthreats.net/blockrules/compromised-ips.txt  {4}
 					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
 					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
 					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.0.7"
+version="3.0.8"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
