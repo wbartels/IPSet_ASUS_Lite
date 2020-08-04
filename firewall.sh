@@ -56,10 +56,10 @@ loginvalid="disabled"	# enabled | disabled
 debugupdate="enabled"	# enabled | disabled
 
 
-blocklist_set="		<alienvault>			https://reputation.alienvault.com/reputation.generic  {8}
-					<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
+blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
 					<blocklist.de>			https://iplists.firehol.org/files/blocklist_de.ipset  {1}
 					<bruteforceblocker>		http://danger.rulez.sk/projects/bruteforceblocker/blist.php  {4}
+					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {1}
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {1}
 					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.0.8"
+version="3.0.9"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -308,7 +308,7 @@ download_Error() {
 			429) printf "Too many requests" ;;
 			431) printf "Request header fields too large" ;;
 			451) printf "Unavailable for legal reasons" ;;
-			500) printf "Internal Server Error" ;;
+			500) printf "Internal server error" ;;
 			501) printf "Not implemented" ;;
 			502) printf "Bad gateway" ;;
 			503) printf "Service unavailable" ;;
