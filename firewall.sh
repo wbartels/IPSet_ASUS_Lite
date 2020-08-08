@@ -86,7 +86,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.0.9"
+version="3.0.10"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -189,7 +189,7 @@ strip_Domain() {
 
 
 filter_Domain() {
-	awk '{gsub("<.+>", ""); print}' | grep -Eo '\b(([a-z](-?[a-z0-9])*)\.)+[a-z]{2,}\b'
+	awk '{gsub("<.+>", ""); print}' | grep -Eo '(([a-z](-?[a-z0-9])*)\.)+[a-z]{2,}'
 }
 
 
@@ -204,11 +204,11 @@ filter_URL_Line() {
 
 
 filter_IP_CIDR() {
-	grep -Eo '\b(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3}(\/(3[0-2]|[1-2][0-9]|[0-9]))?\b'
+	grep -Eo '(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3}(\/(3[0-2]|[1-2][0-9]|[0-9]))?'
 }
 
 
-filter_PrivateIP() {
+filter_Out_PrivateIP() {
 	# https://regex101.com/r/vDjcX3/1
 	grep -Ev '^(0\.|10\.|100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.|127\.|169\.254\.|172\.1[6-9]\.|172\.2[0-9]\.|172\.3[0-1]\.|192\.0\.0\.|192\.0\.2\.|192\.168\.|198\.1[8-9]\.|198\.51\.100\.|203\.0\.113\.|2(2[4-9]|[3-4][0-9]|5[0-5])\.)'
 }
@@ -473,10 +473,10 @@ load_Passlist() {
 	# Passlist router and reserved IP addresses:
 	echo "$passlist_router" | tr -d '\t' | filter_IP_Line | ipset restore -!
 	# Passlist ip:
-	echo "$passlist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Passlist: %s\"\n", $1, $1}' | ipset restore -!
+	echo "$passlist_ip" | filter_IP_CIDR | filter_Out_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Passlist: %s\"\n", $1, $1}' | ipset restore -!
 	# Passlist domain:
 	for domain in $(echo "$passlist_domain" | filter_Domain | awk '!x[$0]++'); do
-		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Passlist: %s\"\n", $1, domain}' | ipset restore -! &
+		lookup_Domain "$domain" | filter_Out_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Passlist: %s\"\n", $1, domain}' | ipset restore -! &
 		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
 	done
 	wait
@@ -494,7 +494,7 @@ load_Passlist() {
 		mv -f "$temp" "$cache"
 	fi
 	if [ -f "$cache" ]; then
-		filter_IP_CIDR < "$cache" | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Passlist: Root hints\"\n", $1}' | ipset restore -!
+		filter_IP_CIDR < "$cache" | filter_Out_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Passlist: Root hints\"\n", $1}' | ipset restore -!
 	fi
 	rm -f "$temp";
 	ipset swap "Skynet-Passlist" "Skynet-Temp"
@@ -508,7 +508,7 @@ load_Blocklist() {
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Blocklist')"
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net comment
-	echo "$blocklist_ip" | filter_IP_CIDR | filter_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, $1}' | ipset restore -!
+	echo "$blocklist_ip" | filter_IP_CIDR | filter_Out_PrivateIP | awk '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, $1}' | ipset restore -!
 	ipset swap "Skynet-Blocklist" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
 	hash_Set "$blocklist_ip" "blocklist_ip"
@@ -522,7 +522,7 @@ load_Domain() {
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net comment
 	for domain in $(echo "$blocklist_domain" | filter_Domain); do
-		lookup_Domain "$domain" | filter_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, domain}' | ipset restore -! &
+		lookup_Domain "$domain" | filter_Out_PrivateIP | awk -v domain="$domain" '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, domain}' | ipset restore -! &
 		n=$((n + 1)); if [ $((n % 50)) -eq 0 ]; then wait; fi
 	done
 	wait
@@ -549,7 +549,7 @@ load_ASN() {
 				--write-out "%{http_code}" --output "$temp" "$url"); curl_exit=$?
 
 			if [ $curl_exit -eq 0 ]; then
-				filter_IP_CIDR < "$temp" | filter_PrivateIP | awk '!x[$0]++' | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, asn}' | ipset restore -!
+				filter_IP_CIDR < "$temp" | filter_Out_PrivateIP | awk '!x[$0]++' | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, asn}' | ipset restore -!
 			elif [ "$http_code" = "429" ]; then
 				log_Skynet "[*] Download error $(download_Error $curl_exit $http_code) $url"
 				touch "$dir_temp/asn_too_many_requests"
@@ -609,7 +609,7 @@ compare_Set() {
 			*.tgz|*.tar.gz)	tar -xzOf "$temp";;
 			*)				gunzip -c "$temp" 2>/dev/null || cat "$temp";;
 		esac
-	} | filter_IP_CIDR | filter_PrivateIP | sort -u > "$filtered_temp"
+	} | filter_IP_CIDR | filter_Out_PrivateIP | sort -u > "$filtered_temp"
 	diff "$filtered_cache" "$filtered_temp" > "$dir_temp/diff"; local diff_exit=$?
 	printf '\033[1A\033[K' # cursor up and clear
 	return $diff_exit
