@@ -62,6 +62,7 @@ blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4
 					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {1}
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {1}
+					<fullbogons>			https://www.team-cymru.org/Services/Bogons/fullbogons-ipv4.txt  {4}
 					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
 					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
 					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
@@ -86,7 +87,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.0.10"
+version="3.0.11"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
