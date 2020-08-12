@@ -19,16 +19,6 @@
 # curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && sh /jffs/scripts/firewall
 #
 # Commands:
-# firewall
-# firewall 10.0.0.0
-# firewall fresh
-# firewall frequency
-# firewall entries
-# firewall warning
-# firewall error
-# firewall update
-# firewall reset
-# firewall uninstall
 # firewall help
 #
 # Readme:
