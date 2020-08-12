@@ -87,7 +87,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.0.11"
+version="3.1.00"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -191,6 +191,11 @@ strip_Domain() {
 
 filter_Domain() {
 	awk '{gsub("<.+>", ""); print}' | grep -Eo '(([a-z](-?[a-z0-9])*)\.)+[a-z]{2,}'
+}
+
+
+is_Domain() {
+	grep -Eo '^(([a-z](-?[a-z0-9])*)\.)+[a-z]{2,}$'
 }
 
 
@@ -453,7 +458,6 @@ load_Passlist() {
 		add Skynet-Temp 224.0.0.0/3 comment \"Passlist: Multicast/reserved/limited broadcast\""
 	local passlist_domain="$passlist_domain $(echo "$blocklist_set $(nvram get firmware_server)" | strip_Domain)
 		$(nvram get ntp_server0) $(nvram get ntp_server1)
-		github.com
 		internic.net
 		ipinfo.io
 		raw.githubusercontent.com
@@ -707,7 +711,7 @@ download_Set() {
 #- Initialize Skynet Lite -#
 ############################
 
-
+domain=$(echo "$command" | is_Domain) && command="domain"
 ip=$(echo "$command" | is_IP) && command="ip"
 if ! ipset list -n Skynet-Primary >/dev/null 2>&1; then
 	command="reset"
@@ -846,6 +850,25 @@ case "$command" in
 	;;
 
 
+	domain)
+		lookup_Domain "$domain" > "$dir_temp/ip.txt"
+		header "Search for $(tr '\n' ' ' < $dir_temp/ip.txt)"
+		while IFS=, read -r setname comment; do
+			ip_found="false"
+			while IFS=, read -r ip; do
+				if ipset -q test "$setname" "$ip"; then
+					echo " [*] $comment"
+					ip_found="true"; break
+				fi
+			done < "$dir_temp/ip.txt"
+			if [ "$ip_found" = "false" ]; then
+				echo " [ ] $comment"
+			fi
+		done < "$dir_system/lookup.csv"
+		footer
+	;;
+
+
 	ip)
 		header "Search for $ip"
 		while IFS=, read -r setname comment; do
@@ -920,7 +943,8 @@ case "$command" in
 	help)
 		header "Commands"
 		echo " firewall"
-		echo " firewall 10.0.0.0"
+		echo " firewall 8.8.8.8"
+		echo " firewall dns.google"
 		echo " firewall fresh"
 		echo " firewall frequency"
 		echo " firewall entries"
