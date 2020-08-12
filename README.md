@@ -35,7 +35,8 @@ sh /jffs/scripts/firewall uninstall
 
 ```
 firewall
-firewall 10.0.0.0
+firewall 8.8.8.8
+firewall dns.google
 firewall fresh
 firewall frequency
 firewall entries
