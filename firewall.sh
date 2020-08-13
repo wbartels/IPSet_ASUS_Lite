@@ -77,7 +77,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.1.00"
+version="3.1.01"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -170,7 +170,7 @@ unload_IPSets() {
 
 lookup_Domain() {
 	set -o pipefail; nslookup "$1" 2>/dev/null | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk 'NR > 2'
-	if [ $? -ne 0 ]; then log_Skynet "[*] nslookup can't resolve $1"; fi
+	if [ $? -ne 0 ]; then log_Skynet "[*] Can't resolve $1"; fi
 }
 
 
@@ -403,9 +403,13 @@ header() {
 	echo " Skynet Lite $version by Willem Bartels"
 	echo " Code is based on Skynet By Adamm"
 	echo
-	if [ -n "$1" ] || [ -n "$2" ]; then
+	if [ -n "$1" ]; then
 		printf '%s\n' '-----------------------------------------------------------'
-		printf ' %-25s  %30s\n' "$1" "$2"
+		if [ -n "$2" ]; then
+			printf ' %-25s  %30s\n' "$1" "$2"
+		else
+			printf ' %.57s\n' "$1"
+		fi
 		printf '%s\n' '-----------------------------------------------------------'
 	fi
 }
@@ -841,7 +845,7 @@ case "$command" in
 
 
 	domain)
-		lookup_Domain "$domain" > "$dir_temp/ip.txt"
+		lookup_Domain "$domain" > "$dir_temp/ip.txt" 2>&1
 		header "Search for $(tr '\n' ' ' < $dir_temp/ip.txt)"
 		while IFS=, read -r setname comment; do
 			ip_found="false"
