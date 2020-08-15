@@ -48,11 +48,9 @@ debugupdate="enabled"	# enabled | disabled
 
 blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
 					<blocklist.de>			https://iplists.firehol.org/files/blocklist_de.ipset  {1}
-					<bruteforceblocker>		http://danger.rulez.sk/projects/bruteforceblocker/blist.php  {4}
 					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {1}
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {1}
-					<fullbogons>			https://www.team-cymru.org/Services/Bogons/fullbogons-ipv4.txt  {4}
 					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
 					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
 					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
@@ -77,7 +75,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.1.01"
+version="3.1.02"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -247,15 +245,15 @@ filter_Skynet_Set() {
 
 download_Error() {
 	if [ "$1" != "22" ]; then
-		printf "curl ($1) "
+		printf "[*] Download error cURL ($1) "
 		case "$1" in
 			 1) printf "Unsupported protocol" ;;
 			 2) printf "Failed initialization" ;;
 			 3) printf "URL malformat" ;;
 			 4) printf "Not built in" ;;
-			 5) printf "Couldn't resolve proxy" ;;
-			 6) printf "Couldn't resolve host" ;;
-			 7) printf "Couldn't connect" ;;
+			 5) printf "Can't resolve proxy" ;;
+			 6) printf "Can't resolve host" ;;
+			 7) printf "Can't connect" ;;
 			 8) printf "Weird server reply" ;;
 			 9) printf "Remote access denied" ;;
 			18) printf "Partial file" ;;
@@ -275,10 +273,10 @@ download_Error() {
 			56) printf "Receive error" ;;
 			60) printf "Peer failed verification" ;;
 			61) printf "Bad content encoding" ;;
-			 *) printf "Error returned by curl" ;;
+			 *) printf "Error returned by cURL" ;;
 		esac
-	else # curl (22) HTTP error code >= 400
-		printf "HTTP/$2 "
+	else # cURL (22) HTTP error code >= 400
+		printf "[*] Download error HTTP/$2 "
 		case "$2" in
 			400) printf "Bad request" ;;
 			401) printf "Unauthorized" ;;
@@ -407,8 +405,10 @@ header() {
 		printf '%s\n' '-----------------------------------------------------------'
 		if [ -n "$2" ]; then
 			printf ' %-25s  %30s\n' "$1" "$2"
+		elif [ $(echo "$1" | wc -m) -gt 57 ]; then
+			printf ' %.54s...\n' "$1"
 		else
-			printf ' %.57s\n' "$1"
+			printf ' %s\n' "$1"
 		fi
 		printf '%s\n' '-----------------------------------------------------------'
 	fi
@@ -550,11 +550,11 @@ load_ASN() {
 			if [ $curl_exit -eq 0 ]; then
 				filter_IP_CIDR < "$temp" | filter_Out_PrivateIP | awk '!x[$0]++' | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, asn}' | ipset restore -!
 			elif [ "$http_code" = "429" ]; then
-				log_Skynet "[*] Download error $(download_Error $curl_exit $http_code) $url"
+				log_Skynet "$(download_Error $curl_exit $http_code) $url"
 				touch "$dir_temp/asn_too_many_requests"
 				rm -f "$dir_reload/asn"
 			else
-				log_Skynet "[*] Download error $(download_Error $curl_exit $http_code) $url"
+				log_Skynet "$(download_Error $curl_exit $http_code) $url"
 				touch "$dir_reload/asn"
 			fi
 			rm -f "$temp"
@@ -661,10 +661,10 @@ download_Set() {
 				mv -f "$filtered_temp" "$filtered_cache"
 			fi
 		elif [ "$http_code" = "429" ]; then
-			log_Skynet "[*] Download error $(download_Error $curl_exit $http_code) $url"
+			log_Skynet "$(download_Error $curl_exit $http_code) $url"
 			touch "$dir_sleep/$setname"
 		else
-			log_Skynet "[*] Download error $(download_Error $curl_exit $http_code) $url"
+			log_Skynet "$(download_Error $curl_exit $http_code) $url"
 			touch "$dir_reload/$setname"
 		fi
 		rm -f "$temp" "$filtered_temp"
