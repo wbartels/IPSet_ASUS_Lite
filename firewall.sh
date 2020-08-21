@@ -56,7 +56,7 @@ blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4
 					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
-					<talosintel>			https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
+					<talosintelligence>		https://talosintelligence.com/documents/ip-blacklist  {12}
 					<tor_exits>				https://iplists.firehol.org/files/tor_exits.ipset  {1}"
 blocklist_ip=""
 blocklist_domain=""
@@ -75,7 +75,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.1.02"
+version="3.1.3"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
