@@ -75,7 +75,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.1.4"
+version="3.1.5"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -245,7 +245,7 @@ filter_Skynet_Set() {
 
 download_Error() {
 	if [ "$1" != "22" ]; then
-		printf "[*] Download error cURL ($1) "
+		printf "[*] Download error cURL (%s) " "$1"
 		case "$1" in
 			 1) printf "Unsupported protocol" ;;
 			 2) printf "Failed initialization" ;;
@@ -276,7 +276,7 @@ download_Error() {
 			 *) printf "Error returned by cURL" ;;
 		esac
 	else # cURL (22) HTTP error code >= 400
-		printf "[*] Download error HTTP/$2 "
+		printf "[*] Download error HTTP/%s " "$2"
 		case "$2" in
 			400) printf "Bad request" ;;
 			401) printf "Unauthorized" ;;
@@ -405,7 +405,7 @@ header() {
 		printf '%s\n' '-----------------------------------------------------------'
 		if [ -n "$2" ]; then
 			printf ' %-25s  %30s\n' "$1" "$2"
-		elif [ $(printf "$1" | wc -m) -gt 57 ]; then
+		elif [ $(echo -n "$1" | wc -m) -gt 57 ]; then
 			printf ' %.54s...\n' "$1"
 		else
 			printf ' %s\n' "$1"
