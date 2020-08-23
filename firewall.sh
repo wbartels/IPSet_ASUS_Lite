@@ -46,18 +46,18 @@ loginvalid="disabled"	# enabled | disabled
 debugupdate="enabled"	# enabled | disabled
 
 
-blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
-					<blocklist.de>			https://iplists.firehol.org/files/blocklist_de.ipset  {1}
-					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {1}
-					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
-					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {1}
-					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
-					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
-					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
-					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
-					<talosintelligence>		https://talosintelligence.com/documents/ip-blacklist  {12}
-					<tor_exits>				https://iplists.firehol.org/files/tor_exits.ipset  {1}"
+blocklist_set="		<binarydefense>		https://www.binarydefense.com/banlist.txt  {4}
+					<blocklist.de>		https://iplists.firehol.org/files/blocklist_de.ipset  {1}
+					<ciarmy>			https://cinsscore.com/list/ci-badguys.txt  {1}
+					<cleantalk>			https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
+					<dshield>			https://iplists.firehol.org/files/dshield_7d.netset  {1}
+					<greensnow>			https://iplists.firehol.org/files/greensnow.ipset  {1}
+					<maxmind>			https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
+					<myip>				https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
+					<spamhaus_drop>		https://www.spamhaus.org/drop/drop.txt  {12}
+					<spamhaus_edrop>	https://www.spamhaus.org/drop/edrop.txt  {12}
+					<talos>				https://talosintelligence.com/documents/ip-blacklist  {12}
+					<tor_exits>			https://iplists.firehol.org/files/tor_exits.ipset  {1}"
 blocklist_ip=""
 blocklist_domain=""
 blocklist_asn=""
@@ -75,7 +75,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.1.3"
+version="3.1.4"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -405,7 +405,7 @@ header() {
 		printf '%s\n' '-----------------------------------------------------------'
 		if [ -n "$2" ]; then
 			printf ' %-25s  %30s\n' "$1" "$2"
-		elif [ $(echo "$1" | wc -m) -gt 57 ]; then
+		elif [ $(printf "$1" | wc -m) -gt 57 ]; then
 			printf ' %.54s...\n' "$1"
 		else
 			printf ' %s\n' "$1"
