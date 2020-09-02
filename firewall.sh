@@ -47,16 +47,16 @@ debugupdate="enabled"	# enabled | disabled
 
 
 blocklist_set="		<binarydefense>		https://www.binarydefense.com/banlist.txt  {4}
-					<blocklist.de>		https://iplists.firehol.org/files/blocklist_de.ipset  {1}
+					<blocklist.de>		zzzzz://iplists.firehol.org/files/blocklist_de.ipset  {1}
 					<ciarmy>			https://cinsscore.com/list/ci-badguys.txt  {1}
 					<cleantalk>			https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>			https://iplists.firehol.org/files/dshield_7d.netset  {1}
 					<greensnow>			https://iplists.firehol.org/files/greensnow.ipset  {1}
 					<maxmind>			https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
 					<myip>				https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
+					<snort>				https://labs.snort.org/feeds/ip-filter.blf  {12}
 					<spamhaus_drop>		https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>	https://www.spamhaus.org/drop/edrop.txt  {12}
-					<talos>				https://iplists.firehol.org/files/talosintel_ipfilter.ipset  {1}
 					<tor_exits>			https://iplists.firehol.org/files/tor_exits.ipset  {1}"
 blocklist_ip=""
 blocklist_domain=""
@@ -75,7 +75,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.1.6"
+version="3.1.7"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
