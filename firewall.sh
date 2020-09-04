@@ -47,7 +47,7 @@ debugupdate="enabled"	# enabled | disabled
 
 
 blocklist_set="		<binarydefense>		https://www.binarydefense.com/banlist.txt  {4}
-					<blocklist.de>		zzzzz://iplists.firehol.org/files/blocklist_de.ipset  {1}
+					<blocklist.de>		https://iplists.firehol.org/files/blocklist_de.ipset  {1}
 					<ciarmy>			https://cinsscore.com/list/ci-badguys.txt  {1}
 					<cleantalk>			https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>			https://iplists.firehol.org/files/dshield_7d.netset  {1}
@@ -75,7 +75,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.1.7"
+version="3.1.8"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
