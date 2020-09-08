@@ -23,17 +23,18 @@
 #
 # Readme:
 # The cron job is started every 15 minutes.
-# By default the set update process is started after 4 cycles = 1 hour.
-# This value can be overruled per set with the {n} tag.
-# In case of a download error, this set is temporarily fixed to 1 cycle until a successful download.
-# Both the <comment> and {n} tag are optional.
-# The order of the url and tags are not important, but need to be on the same line.
+# By default, the set update process is started after 4 cycles = 1 hour.
+# This value can be overridden per set with the tag {n}.
+# If the download fails, this set will be retried at an interval of 15 minutes.
+# Over time, the interval is extended to a maximum of 3 hours.
+#
+# Both the <comment> and {n} tags are optional.
+# The order of the url and tags are not important, but must be on the same line.
 #
 # The other lists (ip, domain and asn) can contain multiple items per list.
 # The items on these lists must be separated with a space, tab or newline.
-# blocklist_ip, blocklist_domain, blocklist_asn and passlist_ip can optional use one <comment> tag per list.
+# blocklist_ip, blocklist_domain, blocklist_asn and passlist_ip can optionally use one <comment> tag per list.
 #
-
 
 ###################
 #- Configuration -#
@@ -46,18 +47,18 @@ loginvalid="disabled"	# enabled | disabled
 debugupdate="enabled"	# enabled | disabled
 
 
-blocklist_set="		<binarydefense>		https://www.binarydefense.com/banlist.txt  {4}
-					<blocklist.de>		https://iplists.firehol.org/files/blocklist_de.ipset  {1}
-					<ciarmy>			https://cinsscore.com/list/ci-badguys.txt  {1}
-					<cleantalk>			https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
-					<dshield>			https://iplists.firehol.org/files/dshield_7d.netset  {1}
-					<greensnow>			https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<maxmind>			https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
-					<myip>				https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
-					<snort>				https://labs.snort.org/feeds/ip-filter.blf  {12}
-					<spamhaus_drop>		https://www.spamhaus.org/drop/drop.txt  {12}
-					<spamhaus_edrop>	https://www.spamhaus.org/drop/edrop.txt  {12}
-					<tor_exits>			https://iplists.firehol.org/files/tor_exits.ipset  {1}"
+blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
+					<blocklist.de>			https://lists.blocklist.de/lists/all.txt  {1}
+					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {1}
+					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
+					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {1}
+					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
+					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
+					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
+					<snort>					https://labs.snort.org/feeds/ip-filter.blf  {12}
+					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
+					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
+					<tor_exits>				https://iplists.firehol.org/files/tor_exits.ipset  {1}"
 blocklist_ip=""
 blocklist_domain=""
 blocklist_asn=""
@@ -75,7 +76,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.1.8"
+version="3.2.0"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -84,12 +85,11 @@ dir_cache="$dir_skynet/cache"
 dir_debug="$dir_skynet/debug"
 dir_filtered="$dir_skynet/filtered"
 dir_reload="$dir_skynet/reload"
-dir_sleep="$dir_skynet/sleep"
 dir_system="$dir_skynet/system"
 dir_temp="$dir_skynet/temp"
 dir_update="$dir_skynet/update"
 mkdir -p "$dir_cache" "$dir_debug" "$dir_filtered" "$dir_reload"
-mkdir -p "$dir_sleep" "$dir_system" "$dir_temp" "$dir_update"
+mkdir -p "$dir_system" "$dir_temp" "$dir_update"
 
 
 ###############
@@ -421,8 +421,7 @@ footer() {
 		printf '%s\n' '-----------------------------------------------------------'
 		printf ' %-25s  %30s\n' \
 			"Uptime $(formatted_File_Age "$dir_system/installtime")" \
-			"$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed download queued"
-			elif [ $(ls -1 "$dir_sleep" | wc -l) -ge 1 ]; then echo "[i] Download sleep"; fi)"
+			"$(if [ $(ls -1 "$dir_reload" | wc -l) -ge 1 ]; then echo "[i] Failed download queued"; fi)"
 	fi
 	printf '\033[?7h\n' # enable line wrap
 }
@@ -572,10 +571,6 @@ load_ASN() {
 
 load_Set() {
 	log_Skynet "[i] Update $comment"
-	if ! ipset -n list "$setname" >/dev/null 2>&1; then
-		ipset create "$setname" hash:net maxelem 524288 comment
-		ipset add Skynet-Primary "$setname" comment "$comment"
-	fi
 	grep -E '^[+][0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/add"
 	grep -E '^[-][0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/del"
 	awk -v setname="$setname" -v comment="$comment" '{printf "add %s %s comment \"Blocklist: %s\"\n", setname, $1, comment}' "$dir_temp/add" | ipset restore -!
@@ -626,15 +621,21 @@ download_Set() {
 		setname="Skynet-$(echo -n "$url" | md5sum | cut -c1-24)"
 		echo "$setname,$comment" >> "$dir_temp/lookup.csv"
 
-		if [ $((updatecount % update_cycles)) -ne 0 ] && [ ! -f "$dir_reload/$setname" ]; then
+		if ! ipset -n list "$setname" >/dev/null 2>&1; then
+			ipset create "$setname" hash:net maxelem 524288 comment
+			ipset add Skynet-Primary "$setname" comment "$comment"
+		fi
+		if [ -f "$dir_reload/$setname" ]; then
+			update_cycles=1
+			if [ $(head -1 "$dir_reload/$setname" 2>/dev/null) -ge 27 ]; then
+				update_cycles=12
+			elif [ $(head -1 "$dir_reload/$setname" 2>/dev/null) -ge 4 ]; then
+				update_cycles=4
+			fi
+		fi
+		if [ $((updatecount % update_cycles)) -ne 0 ]; then
 			continue
 		fi
-		if [ -f "$dir_sleep/$setname" ] && [ $(file_Age "$dir_sleep/$setname") -lt 14400 ]; then
-			log_Skynet "[!] Sleep $(formatted_Time $((14400 - $(file_Age "$dir_sleep/$setname")))) $comment"
-			continue
-		fi
-		rm -f "$dir_reload/$setname"
-		rm -f "$dir_sleep/$setname"
 
 		echo " [i] Download $comment"
 		temp="$dir_temp/${setname}_unfiltered"; touch "$temp"
@@ -652,7 +653,7 @@ download_Set() {
 		if [ $curl_exit -eq 0 ]; then
 			if [ "$http_code" = "304" ]; then
 				log_Skynet "[i] Fresh $comment"
-			elif compare_Set && ipset -n list "$setname" >/dev/null 2>&1; then
+			elif compare_Set && [ -f "$cache" ]; then
 				log_Skynet "[!] Redownload $comment"
 				mv -f "$temp" "$cache"
 			else
@@ -660,12 +661,14 @@ download_Set() {
 				mv -f "$temp" "$cache"
 				mv -f "$filtered_temp" "$filtered_cache"
 			fi
-		elif [ "$http_code" = "429" ]; then
-			log_Skynet "$(download_Error $curl_exit $http_code) $url"
-			touch "$dir_sleep/$setname"
+			rm -f "$dir_reload/$setname"
 		else
 			log_Skynet "$(download_Error $curl_exit $http_code) $url"
-			touch "$dir_reload/$setname"
+			if [ "$http_code" = "429" ]; then
+				echo "99" > "$dir_reload/$setname"
+			else
+				update_Counter "$dir_reload/$setname" >/dev/null
+			fi
 		fi
 		rm -f "$temp" "$filtered_temp"
 	done < "$dir_temp/blocklist_set"
@@ -681,7 +684,7 @@ download_Set() {
 		fi
 	done
 	# Cleanup directories
-	for dir in "$dir_cache" "$dir_filtered" "$dir_reload" "$dir_sleep" "$dir_update"; do
+	for dir in "$dir_cache" "$dir_filtered" "$dir_reload" "$dir_update"; do
 		cd "$dir"
 		for setname in $(ls -1 | filter_Skynet_Set); do
 			if ! echo "$list" | grep -q "$setname"; then
@@ -704,6 +707,7 @@ download_Set() {
 ############################
 #- Initialize Skynet Lite -#
 ############################
+
 
 domain=$(echo "$command" | is_Domain) && command="domain"
 ip=$(echo "$command" | is_IP) && command="ip"
@@ -753,7 +757,7 @@ fi
 
 exec 99>"$lockfile"
 if ! flock -n 99; then
-	echo " [i] Skynet Lite is locked, please try again later"; echo; exit 1
+	echo "[i] Skynet Lite is locked, please try again later"; echo; exit 1
 fi
 
 
@@ -771,7 +775,7 @@ case "$command" in
 		header "Reset"
 		log_Skynet "[i] Install"
 		rm -f "$dir_cache/"* "$dir_debug/"* "$dir_filtered/"* "$dir_reload/"*
-		rm -f "$dir_sleep/"* "$dir_system/"* "$dir_temp/"* "$dir_update/"*
+		rm -f "$dir_system/"* "$dir_temp/"* "$dir_update/"*
 		true > "$dir_skynet/warning.log"
 		true > "$dir_skynet/error.log"
 		touch "$dir_system/installtime"
