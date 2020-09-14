@@ -76,7 +76,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.2.0"
+version="3.2.1"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -717,20 +717,12 @@ if ! ipset list -n Skynet-Primary >/dev/null 2>&1; then
 fi
 
 
-if [ "$(nvram get wan0_proto)" = "pppoe" ]; then
-	iface="ppp0"
-else
-	iface="$(nvram get wan0_ifname)"
-fi
-
-
 i=0
 while [ "$(nvram get ntp_ready)" != "1" ] && [ "$command" != "uninstall" ]; do
 	if [ $i -eq 0 ]; then log_Skynet "[i] Waiting for NTP to sync..."; fi
 	if [ $i -eq 300 ]; then log_Skynet "[*] NTP failed to start after 5 minutes - Please fix immediately!"; echo; exit 1; fi
 	i=$((i + 1)); sleep 1
 done
-start_time=$(($(date +%s) - i))
 
 
 if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
@@ -745,24 +737,34 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 fi
 
 
-if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
-	throttle="2M"
-	updatecount=$(update_Counter "$dir_system/updatecount")
-	execution_time=$(($(date +%s) - start_time))
-	if [ $execution_time -ge 0 ] && [ $execution_time -lt 10 ]; then
-		sleep $((10 - execution_time))
+exec 99>"$lockfile"
+if ! flock -n 99; then
+	if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
+		log_Skynet "[*] Skynet Lite is locked, update again in 15 minutes"
+		exit 1;
 	fi
+	printf '\n\033[1A' # newline and cursor up
+	printf '[i] Skynet Lite is locked, retry command every 2 seconds...'
+	sleep 2
+	exec "$0" "$@"
 fi
 
 
-exec 99>"$lockfile"
-if ! flock -n 99; then
-	echo "[i] Skynet Lite is locked, please try again later"; echo; exit 1
+if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
+	throttle="2M"
+	updatecount=$(update_Counter "$dir_system/updatecount")
+fi
+
+
+if [ "$(nvram get wan0_proto)" = "pppoe" ]; then
+	iface="ppp0"
+else
+	iface="$(nvram get wan0_ifname)"
 fi
 
 
 cp "$dir_system/lookup.csv" "$dir_temp/lookup.csv"
-unset i execution_time
+unset i
 
 
 #######################
