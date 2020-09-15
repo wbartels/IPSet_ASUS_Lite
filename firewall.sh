@@ -76,7 +76,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.2.1"
+version="3.2.2"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -740,7 +740,7 @@ fi
 exec 99>"$lockfile"
 if ! flock -n 99; then
 	if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
-		log_Skynet "[*] Skynet Lite is locked, update again in 15 minutes"
+		log_Skynet "[!] Skynet Lite is locked, next update scheduled"
 		exit 1;
 	fi
 	printf '\n\033[1A' # newline and cursor up
