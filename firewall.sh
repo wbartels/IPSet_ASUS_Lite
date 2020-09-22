@@ -66,32 +66,6 @@ passlist_ip=""
 passlist_domain=""
 
 
-##########################
-#- End of configuration -#
-##########################
-
-
-command="$1"
-option="$2"
-throttle=0
-updatecount=0
-iotblocked="disabled"
-version="3.2.2"
-useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
-lockfile="/tmp/var/lock/skynet.lock"
-
-dir_skynet="/tmp/skynet"
-dir_cache="$dir_skynet/cache"
-dir_debug="$dir_skynet/debug"
-dir_filtered="$dir_skynet/filtered"
-dir_reload="$dir_skynet/reload"
-dir_system="$dir_skynet/system"
-dir_temp="$dir_skynet/temp"
-dir_update="$dir_skynet/update"
-mkdir -p "$dir_cache" "$dir_debug" "$dir_filtered" "$dir_reload"
-mkdir -p "$dir_system" "$dir_temp" "$dir_update"
-
-
 ###############
 #- Functions -#
 ###############
@@ -709,6 +683,27 @@ download_Set() {
 ############################
 
 
+command="$1"
+option="$2"
+throttle=0
+updatecount=0
+iotblocked="disabled"
+version="3.2.3"
+useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
+lockfile="/tmp/var/lock/skynet.lock"
+
+dir_skynet="/tmp/skynet"
+dir_cache="$dir_skynet/cache"
+dir_debug="$dir_skynet/debug"
+dir_filtered="$dir_skynet/filtered"
+dir_reload="$dir_skynet/reload"
+dir_system="$dir_skynet/system"
+dir_temp="$dir_skynet/temp"
+dir_update="$dir_skynet/update"
+mkdir -p "$dir_cache" "$dir_debug" "$dir_filtered" "$dir_reload"
+mkdir -p "$dir_system" "$dir_temp" "$dir_update"
+
+
 domain=$(echo "$command" | is_Domain) && command="domain"
 ip=$(echo "$command" | is_IP) && command="ip"
 if ! ipset list -n Skynet-Primary >/dev/null 2>&1; then
@@ -746,7 +741,7 @@ if ! flock -n 99; then
 	printf '\n\033[1A' # newline and cursor up
 	printf '[i] Skynet Lite is locked, retry command every 2 seconds...'
 	sleep 2
-	exec "$0" "$@"
+	exec "$0" "$command"
 fi
 
 
