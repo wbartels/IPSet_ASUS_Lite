@@ -323,6 +323,11 @@ lookup_Comment() {
 }
 
 
+formatted_Number() {
+	echo $1 | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'
+}
+
+
 formatted_Time() {
 	if [ $1 -lt 86400 ]; then
 		printf '%02d:%02d' $(($1/3600)) $(($1%3600/60))
@@ -688,7 +693,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.2.3"
+version="3.3.0"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -926,11 +931,12 @@ case "$command" in
 
 	entries)
 		header "List" "Number of entries"
-		true > "$dir_temp/file.csv"
+		true > "$dir_temp/file.ssv" # semicolon separated value
 		while IFS=, read -r setname comment; do
-			echo "$comment,$(ipset -t list "$setname" | grep -F 'Number of entries' | grep -Eo '[0-9]+')" >> "$dir_temp/file.csv"
+			n=$(ipset -t list "$setname" | grep -F 'Number of entries' | grep -Eo '[0-9]+')
+			echo "$comment;$n;$(formatted_Number $n)" >> "$dir_temp/file.ssv"
 		done < "$dir_system/lookup.csv"
-		sort -t, -k2nr < "$dir_temp/file.csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
+		sort -t';' -k2nr < "$dir_temp/file.ssv" | awk -F';' '{printf " %-40s  %15s\n", $1, $3}'
 		footer
 	;;
 
@@ -955,11 +961,11 @@ case "$command" in
 
 	*)
 		header "Blocklist" "Packets blocked"
-		true > "$dir_temp/file.csv"
+		true > "$dir_temp/file.ssv" # semicolon separated value
 		ipset list Skynet-Primary | filter_Skynet | awk '{print $1 "," $3}' | while IFS=, read -r setname blocked; do
-			echo "$(lookup_Comment "$setname"),$blocked" >> "$dir_temp/file.csv"
+			echo "$(lookup_Comment "$setname");$blocked;$(formatted_Number $blocked)" >> "$dir_temp/file.ssv"
 		done
-		sort -t, -k2nr -k1,1 < "$dir_temp/file.csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
+		sort -t';' -k2nr -k1,1 < "$dir_temp/file.ssv" | awk -F';' '{printf " %-40s  %15s\n", $1, $3}'
 		footer
 	;;
 esac
