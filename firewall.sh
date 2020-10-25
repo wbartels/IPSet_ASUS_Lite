@@ -43,21 +43,21 @@
 
 filtertraffic="all"		# inbound | outbound | all
 logmode="enabled"		# enabled | disabled
-loginvalid="disabled"	# enabled | disabled
-debugupdate="enabled"	# enabled | disabled
+loginvalid="disabled"	# enabled | disabled (must be enabled for autoban)
+autoban_treshold=0		# autoban ip adresses with a tershold of n unique invalid port connections (0 will disable this feature)
 
 
 blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
-					<blocklist.de>			https://lists.blocklist.de/lists/all.txt  {1}
+					<blocklist.de>			https://iplists.firehol.org/files/blocklist_de.ipset  {1}
 					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {1}
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {1}
 					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
 					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
 					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
-					<snort>					https://labs.snort.org/feeds/ip-filter.blf  {12}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
+					<talosintel>        	https://talosintel.com/feeds/ip-filter.blf  {12}
 					<tor_exits>				https://iplists.firehol.org/files/tor_exits.ipset  {1}"
 blocklist_ip=""
 blocklist_domain=""
@@ -218,7 +218,14 @@ filter_Skynet_Set() {
 
 
 download_Error() {
-	if [ "$1" != "22" ]; then
+	if [ "$1" = "22" ]; then # HTTP error code >= 400
+		printf "[*] Download error HTTP/%s " "$2"
+		case "$2" in
+			4[0-9][0-9]) printf "Client error" ;;
+			5[0-9][0-9]) printf "Server error" ;;
+					  *) printf "Unknown error" ;;
+		esac
+	else
 		printf "[*] Download error cURL (%s) " "$1"
 		case "$1" in
 			 1) printf "Unsupported protocol" ;;
@@ -249,46 +256,6 @@ download_Error() {
 			61) printf "Bad content encoding" ;;
 			 *) printf "Error returned by cURL" ;;
 		esac
-	else # cURL (22) HTTP error code >= 400
-		printf "[*] Download error HTTP/%s " "$2"
-		case "$2" in
-			400) printf "Bad request" ;;
-			401) printf "Unauthorized" ;;
-			402) printf "Payment required" ;;
-			403) printf "Forbidden" ;;
-			404) printf "Not found" ;;
-			405) printf "Method not allowed" ;;
-			406) printf "Not acceptable" ;;
-			407) printf "Proxy authentication required" ;;
-			408) printf "Request timeout" ;;
-			409) printf "Conflict" ;;
-			410) printf "Gone" ;;
-			411) printf "Length required" ;;
-			412) printf "Precondition failed" ;;
-			413) printf "Payload too large" ;;
-			414) printf "URI too long" ;;
-			415) printf "Unsupported media type" ;;
-			416) printf "Range not satisfiable" ;;
-			417) printf "Expectation failed" ;;
-			425) printf "Too early" ;;
-			426) printf "Upgrade required" ;;
-			428) printf "Precondition required" ;;
-			429) printf "Too many requests" ;;
-			431) printf "Request header fields too large" ;;
-			451) printf "Unavailable for legal reasons" ;;
-			500) printf "Internal server error" ;;
-			501) printf "Not implemented" ;;
-			502) printf "Bad gateway" ;;
-			503) printf "Service unavailable" ;;
-			504) printf "Gateway timeout" ;;
-			505) printf "HTTP version not supported" ;;
-			506) printf "Variant also negotiates" ;;
-			510) printf "Not extended" ;;
-			511) printf "Network authentication required" ;;
-	4[0-9][0-9]) printf "Client error" ;;
-	5[0-9][0-9]) printf "Server error" ;;
-			  *) printf "Unknown error" ;;
-		esac
 	fi
 }
 
@@ -315,6 +282,7 @@ lookup_Comment_Init() {
  	echo "Skynet-Blocklist,$(echo "$blocklist_ip" | filter_Comment || echo "blocklist_ip")" >> "$dir_temp/lookup.csv"
 	echo "Skynet-Domain,$(echo "$blocklist_domain" | filter_Comment || echo "blocklist_domain")" >> "$dir_temp/lookup.csv"
 	echo "Skynet-ASN,$(echo "$blocklist_asn" | filter_Comment || echo "blocklist_asn")" >> "$dir_temp/lookup.csv"
+	echo "Skynet-Autoban,blocklist_autoban" >> "$dir_temp/lookup.csv"
 }
 
 
@@ -548,20 +516,31 @@ load_ASN() {
 }
 
 
+load_Autoban() {
+	if [ $autoban_treshold -gt 0 ]; then
+		log_Skynet "[i] Update $(lookup_Comment 'Skynet-Autoban')"
+		cat /tmp/syslog.log /tmp/syslog.log-1 2>/dev/null | grep -E '\[BLOCKED - INVALID\]' | grep -E 'DPT=[0-9]+' | \
+		grep -Eo 'SRC=[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|DPT=[0-9]+' | awk 'ORS=NR%2?" ":"\n"' | awk '!x[$0]++' | \
+		grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | sort | uniq -cd | awk -v treshold="$autoban_treshold" '$1 >= treshold {print $2}' | \
+		awk '{printf "add Skynet-Autoban %s comment \"Blocklist: %s\"\n", $1, $1}' | ipset -exist restore
+	else
+		ipset flush Skynet-Autoban
+	fi
+}
+
+
 load_Set() {
 	log_Skynet "[i] Update $comment"
 	grep -E '^[+][0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/add"
 	grep -E '^[-][0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/del"
 	awk -v setname="$setname" -v comment="$comment" '{printf "add %s %s comment \"Blocklist: %s\"\n", setname, $1, comment}' "$dir_temp/add" | ipset restore -!
 	awk -v setname="$setname" '{printf "del %s %s\n", setname, $1}' "$dir_temp/del" | ipset restore -!
-	if [ "$debugupdate" = "enabled" ]; then
-		printf '%s | %6s | %7s | %7s |\n' \
-			"$(date '+%b %d %T')" \
-			"$(wc -l < "$filtered_temp")" \
-			"-$(wc -l < "$dir_temp/del")" \
-			"+$(wc -l < "$dir_temp/add")" >> "$dir_debug/$comment.log"
-		log_Tail "$dir_debug/$comment.log"
-	fi
+	printf '%s | %6s | %7s | %7s |\n' \
+		"$(date '+%b %d %T')" \
+		"$(wc -l < "$filtered_temp")" \
+		"-$(wc -l < "$dir_temp/del")" \
+		"+$(wc -l < "$dir_temp/add")" >> "$dir_debug/$comment.log"
+	log_Tail "$dir_debug/$comment.log"
 	update_Counter "$dir_update/$setname" >/dev/null
 	rm -f "$dir_temp/diff" "$dir_temp/add" "$dir_temp/del"
 }
@@ -693,7 +672,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.3.0"
+version="3.4.0"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -800,20 +779,23 @@ case "$command" in
 		unload_IPTables
 		unload_LogIPTables
 		unload_IPSets
-		echo 'create Skynet-Primary list:set size 64 comment counters
+		echo 'create Skynet-Passlist hash:net comment
+			create Skynet-Primary list:set size 64 comment counters
 			create Skynet-Blocklist hash:net comment
 			create Skynet-Domain hash:net comment
 			create Skynet-ASN hash:net comment
-			create Skynet-Passlist hash:net comment
+			create Skynet-Autoban hash:net comment timeout 604800
 			add Skynet-Primary Skynet-Blocklist comment "blocklist_ip"
 			add Skynet-Primary Skynet-Domain comment "blocklist_domain"
-			add Skynet-Primary Skynet-ASN comment "blocklist_asn"' | tr -d '\t' | ipset restore -!
+			add Skynet-Primary Skynet-ASN comment "blocklist_asn"
+			add Skynet-Primary Skynet-Autoban comment "blocklist_autoban"' | tr -d '\t' | ipset restore -!
 		load_IPTables
 		load_LogIPTables
 		load_Passlist
 		load_Blocklist
 		load_Domain
 		load_ASN
+		load_Autoban
 		download_Set
 		footer
 	;;
@@ -826,6 +808,7 @@ case "$command" in
 		load_Blocklist
 		load_Domain
 		load_ASN
+		load_Autoban
 		download_Set
 		footer
 	;;
