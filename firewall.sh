@@ -26,7 +26,7 @@
 # By default, the set update process is started after 4 cycles = 1 hour.
 # This value can be overridden per set with the tag {n}.
 # If the download fails, this set will be retried at an interval of 15 minutes.
-# Over time, the interval is extended to a maximum of 3 hours.
+# Over time, the interval is extended to a maximum of 6 hours.
 #
 # Both the <comment> and {n} tags are optional.
 # The order of the url and tags are not important, but must be on the same line.
@@ -172,7 +172,7 @@ filter_URL_Line() {
 
 
 filter_IP_CIDR() {
-	grep -Eo '(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3}(\/(3[0-2]|[1-2][0-9]|[0-9]))?'
+	grep -Eo '(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3}(/(3[0-2]|[1-2][0-9]|[0-9]))?'
 }
 
 
@@ -586,7 +586,7 @@ download_Set() {
 		if [ -f "$dir_reload/$setname" ]; then
 			update_cycles=1
 			if [ $(head -1 "$dir_reload/$setname" 2>/dev/null) -ge 27 ]; then
-				update_cycles=12
+				update_cycles=24
 			elif [ $(head -1 "$dir_reload/$setname" 2>/dev/null) -ge 4 ]; then
 				update_cycles=4
 			fi
@@ -672,7 +672,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.4.0"
+version="3.4.1"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
