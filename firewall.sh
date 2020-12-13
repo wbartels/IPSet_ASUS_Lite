@@ -43,9 +43,7 @@
 
 filtertraffic="all"		# inbound | outbound | all
 logmode="enabled"		# enabled | disabled
-loginvalid="disabled"	# enabled | disabled (must be enabled for autoban)
-autoban_treshold=0		# autoban ip adresses with a tershold of n unique invalid port connections (0 will disable this feature)
-
+loginvalid="disabled"	# enabled | disabled
 
 blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
 					<blocklist.de>			https://iplists.firehol.org/files/blocklist_de.ipset  {1}
@@ -282,7 +280,6 @@ lookup_Comment_Init() {
  	echo "Skynet-Blocklist,$(echo "$blocklist_ip" | filter_Comment || echo "blocklist_ip")" >> "$dir_temp/lookup.csv"
 	echo "Skynet-Domain,$(echo "$blocklist_domain" | filter_Comment || echo "blocklist_domain")" >> "$dir_temp/lookup.csv"
 	echo "Skynet-ASN,$(echo "$blocklist_asn" | filter_Comment || echo "blocklist_asn")" >> "$dir_temp/lookup.csv"
-	echo "Skynet-Autoban,blocklist_autoban" >> "$dir_temp/lookup.csv"
 }
 
 
@@ -516,19 +513,6 @@ load_ASN() {
 }
 
 
-load_Autoban() {
-	if [ $autoban_treshold -gt 0 ]; then
-		log_Skynet "[i] Update $(lookup_Comment 'Skynet-Autoban')"
-		cat /tmp/syslog.log /tmp/syslog.log-1 2>/dev/null | grep -E '\[BLOCKED - INVALID\]' | grep -E 'DPT=[0-9]+' | \
-		grep -Eo 'SRC=[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|DPT=[0-9]+' | awk 'ORS=NR%2?" ":"\n"' | awk '!x[$0]++' | \
-		grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | sort | uniq -cd | awk -v treshold="$autoban_treshold" '$1 >= treshold {print $2}' | \
-		awk '{printf "add Skynet-Autoban %s comment \"Blocklist: %s\"\n", $1, $1}' | ipset -exist restore
-	else
-		ipset flush Skynet-Autoban
-	fi
-}
-
-
 load_Set() {
 	log_Skynet "[i] Update $comment"
 	grep -E '^[+][0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/add"
@@ -672,7 +656,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.4.2"
+version="3.5.0"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -784,18 +768,15 @@ case "$command" in
 			create Skynet-Blocklist hash:net comment
 			create Skynet-Domain hash:net comment
 			create Skynet-ASN hash:net comment
-			create Skynet-Autoban hash:net comment timeout 604800
 			add Skynet-Primary Skynet-Blocklist comment "blocklist_ip"
 			add Skynet-Primary Skynet-Domain comment "blocklist_domain"
-			add Skynet-Primary Skynet-ASN comment "blocklist_asn"
-			add Skynet-Primary Skynet-Autoban comment "blocklist_autoban"' | tr -d '\t' | ipset restore -!
+			add Skynet-Primary Skynet-ASN comment "blocklist_asn"' | tr -d '\t' | ipset restore -!
 		load_IPTables
 		load_LogIPTables
 		load_Passlist
 		load_Blocklist
 		load_Domain
 		load_ASN
-		load_Autoban
 		download_Set
 		footer
 	;;
@@ -808,7 +789,6 @@ case "$command" in
 		load_Blocklist
 		load_Domain
 		load_ASN
-		load_Autoban
 		download_Set
 		footer
 	;;
