@@ -395,17 +395,16 @@ load_Passlist() {
 		add Skynet-Temp 224.0.0.0/3 comment \"Passlist: Multicast/reserved/limited broadcast\""
 	local passlist_domain="$passlist_domain $(echo "$blocklist_set $(nvram get firmware_server)" | strip_Domain)
 		$(nvram get ntp_server0) $(nvram get ntp_server1)
-		internic.net
 		ipinfo.io
 		raw.githubusercontent.com
+		www.internic.net
 		dns.adguard.com
 		dns.cloudflare.com
 		dns.google
+		dns.nextdns.io
 		dns.opendns.com
 		dns.quad9.net
-		one.one.one.one
-		recpubns1.nstld.net
-		recpubns2.nstld.net"
+		one.one.one.one"
 
 	if [ $((updatecount % 48)) -ne 0 ] && hash_Unmodified "$passlist_router $passlist_ip $passlist_domain" "passlist"; then return; fi
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Passlist')"
@@ -656,7 +655,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.5.0"
+version="3.5.1"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
