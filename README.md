@@ -20,7 +20,7 @@ Administration > System > Enable JFFS custom scripts and configs: Yes > Apply
 Type the following line in your favorite SSH Client:
 
 ```Shell
-curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && sh /jffs/scripts/firewall
+curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && /jffs/scripts/firewall
 ```
 
 ## Uninstall
@@ -28,7 +28,7 @@ curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.
 Type the following line in your favorite SSH Client:
 
 ```Shell
-sh /jffs/scripts/firewall uninstall
+/jffs/scripts/firewall uninstall
 ```
 
 ## Commands
