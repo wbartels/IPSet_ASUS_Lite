@@ -16,7 +16,7 @@
 #
 #
 # Installation:
-# curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && sh /jffs/scripts/firewall
+# curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && /jffs/scripts/firewall
 #
 # Commands:
 # firewall help
@@ -655,7 +655,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.5.1"
+version="3.5.2"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -758,7 +758,7 @@ case "$command" in
 		fi
 		rand=$(rand 1 14)
 		cru d Skynet_update
-		cru a Skynet_update "$((rand + 0)),$((rand + 15)),$((rand + 30)),$((rand + 45)) * * * * nice -n 19 sh /jffs/scripts/firewall update cru"
+		cru a Skynet_update "$((rand + 0)),$((rand + 15)),$((rand + 30)),$((rand + 45)) * * * * nice -n 19 /jffs/scripts/firewall update cru"
 		unload_IPTables
 		unload_LogIPTables
 		unload_IPSets
