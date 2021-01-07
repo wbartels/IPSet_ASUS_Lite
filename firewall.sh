@@ -487,10 +487,11 @@ load_ASN() {
 
 			http_code=$(curl -sf --location --user-agent "$useragent" \
 				--connect-timeout 10 --max-time 90 --limit-rate "$throttle" \
-				--write-out "%{http_code}" --output "$temp" "$url"); curl_exit=$?
+				--write-out "%{http_code}" --output "$temp" "$url" \
+				--header "Accept-encoding: gzip"); curl_exit=$?
 
 			if [ $curl_exit -eq 0 ]; then
-				filter_IP_CIDR < "$temp" | filter_Out_PrivateIP | awk '!x[$0]++' | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, asn}' | ipset restore -!
+				{ gunzip -c "$temp" 2>/dev/null || cat "$temp"; } | filter_IP_CIDR | filter_Out_PrivateIP | awk '!x[$0]++' | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, asn}' | ipset restore -!
 			elif [ "$http_code" = "429" ]; then
 				log_Skynet "$(download_Error $curl_exit $http_code) $url"
 				touch "$dir_temp/asn_too_many_requests"
@@ -538,13 +539,7 @@ compare_Set() {
 	if [ ! -f "$filtered_cache" ]; then
 		touch "$filtered_cache"
 	fi
-	{
-		case "$url" in
-			*.zip)			unzip -p "$temp";;
-			*.tgz|*.tar.gz)	tar -xzOf "$temp";;
-			*)				gunzip -c "$temp" 2>/dev/null || cat "$temp";;
-		esac
-	} | filter_IP_CIDR | filter_Out_PrivateIP | sort -u > "$filtered_temp"
+	{ gunzip -c "$temp" 2>/dev/null || cat "$temp"; } | filter_IP_CIDR | filter_Out_PrivateIP | sort -u > "$filtered_temp"
 	diff "$filtered_cache" "$filtered_temp" > "$dir_temp/diff"; local diff_exit=$?
 	printf '\033[1A\033[K' # cursor up and clear
 	return $diff_exit
@@ -655,7 +650,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.5.2"
+version="3.6.0"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
