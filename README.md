@@ -5,8 +5,7 @@ Skynet Lite relies on the IPTables from Skynet by Adamm.
 
 ## Key features
 - Small one file shell script, no need for an external USB drive.
-- Blocklist sets can be plain text or compressed with: *.zip, *.tgz, *.tar.gz or *.gz
-- Also supports plain text gzip transfer-encoding.
+- Support for plain text gzip transfer-encoding.
 - Only download and update changed blocklist sets.
 - Use incremental update for all blocklist sets.
 - For all other lists the ipset swap feature is used.
