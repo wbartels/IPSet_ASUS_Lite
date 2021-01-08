@@ -428,9 +428,9 @@ load_Passlist() {
 
 	http_code=$(curl -sf --location --user-agent "$useragent" \
 		--connect-timeout 10 --max-time 90 --limit-rate "$throttle" \
-		--write-out "%{http_code}" --output "$temp" "$url" \
+		--write-out "%{http_code}" --output "$temp" \
 		--remote-time --time-cond "$cache" \
-		--header "Accept-encoding: gzip"); curl_exit=$?
+		--header "Accept-encoding: gzip" "$url"); curl_exit=$?
 
 	if [ $curl_exit -eq 0 ] && [ "$http_code" = "200" ]; then
 		mv -f "$temp" "$cache"
@@ -488,8 +488,8 @@ load_ASN() {
 
 			http_code=$(curl -sf --location --user-agent "$useragent" \
 				--connect-timeout 10 --max-time 90 --limit-rate "$throttle" \
-				--write-out "%{http_code}" --output "$temp" "$url" \
-				--header "Accept-encoding: gzip"); curl_exit=$?
+				--write-out "%{http_code}" --output "$temp" \
+				--header "Accept-encoding: gzip" "$url"); curl_exit=$?
 
 			if [ $curl_exit -eq 0 ]; then
 				{ gunzip -c "$temp" 2>/dev/null || cat "$temp"; } | filter_IP_CIDR | filter_Out_PrivateIP | awk '!x[$0]++' | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, asn}' | ipset restore -!
@@ -582,9 +582,9 @@ download_Set() {
 
 		http_code=$(curl -sf --location --user-agent "$useragent" \
 			--connect-timeout 10 --max-time 90 --limit-rate "$throttle" \
-			--write-out "%{http_code}" --output "$temp" "$url" \
+			--write-out "%{http_code}" --output "$temp" \
 			--remote-time --time-cond "$cache" \
-			--header "Accept-encoding: gzip"); curl_exit=$?
+			--header "Accept-encoding: gzip" "$url"); curl_exit=$?
 		printf '\033[1A\033[K' # cursor up and clear
 
 		if [ $curl_exit -eq 0 ]; then
@@ -651,7 +651,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.6.1"
+version="3.6.2"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
