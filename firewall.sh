@@ -60,7 +60,7 @@ blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4
 					<digitalside>           https://osint.digitalside.it/Threat-Intel/lists/latestips.txt
 					<italiancert>           https://infosec.cert-pa.it/analyze/listip.txt
 			        <azorult>               https://azorult-tracker.net/api/ip/
-					<stamparm>               https://github.com/stamparm/ipsum/blob/master/levels/4.txt
+					<stamparm>              https://github.com/stamparm/ipsum/blob/master/levels/4.txt
 blocklist_ip=""
 blocklist_domain=""
 blocklist_asn=""
