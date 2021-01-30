@@ -57,6 +57,10 @@ blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
 					<talosintel>			https://talosintelligence.com/documents/ip-blacklist  {12}
 					<tor_exits>				https://iplists.firehol.org/files/tor_exits.ipset  {1}"
+					<digitalside>           https://osint.digitalside.it/Threat-Intel/lists/latestips.txt
+					<italiancert>           https://infosec.cert-pa.it/analyze/listip.txt
+			        <azorult>               https://azorult-tracker.net/api/ip/
+					<stamparm>               https://github.com/stamparm/ipsum/blob/master/levels/4.txt
 blocklist_ip=""
 blocklist_domain=""
 blocklist_asn=""
