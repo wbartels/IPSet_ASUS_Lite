@@ -334,7 +334,7 @@ update_Counter() {
 
 rand() {
 	local min=$1 max=$2
-	echo $((min + $(printf '%d' 0x$(openssl rand 2 -hex)) * (max - min + 1) / 65025))
+	echo $((min + $(printf '%d' 0x$(openssl rand -hex 2)) * (max - min + 1) / 65025))
 }
 
 
@@ -651,7 +651,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.6.2"
+version="3.6.3"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
