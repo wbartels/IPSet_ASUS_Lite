@@ -651,7 +651,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.6.3"
+version="3.6.4"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -746,11 +746,11 @@ case "$command" in
 		fi
 		if [ ! -f "/jffs/scripts/firewall-start" ]; then
 			echo "#!/bin/sh
-			sh /jffs/scripts/firewall" | tr -d '\t' > "/jffs/scripts/firewall-start"
+			/jffs/scripts/firewall" | tr -d '\t' > "/jffs/scripts/firewall-start"
 			chmod 755 "/jffs/scripts/firewall-start"
 		elif [ -f "/jffs/scripts/firewall-start" ] && ! grep -q "/jffs/scripts/firewall" "/jffs/scripts/firewall-start"; then
 			chmod 755 "/jffs/scripts/firewall-start"
-			echo "sh /jffs/scripts/firewall" >> "/jffs/scripts/firewall-start"
+			echo "/jffs/scripts/firewall" >> "/jffs/scripts/firewall-start"
 		fi
 		rand=$(rand 1 14)
 		cru d Skynet_update
