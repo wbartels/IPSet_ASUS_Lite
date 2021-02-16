@@ -294,7 +294,9 @@ formatted_Number() {
 
 
 formatted_Time() {
-	if [ $1 -lt 86400 ]; then
+	if [ "$1" != $(($1)) ]; then
+		printf 'undefined'
+	elif [ $1 -lt 86400 ]; then
 		printf '%02d:%02d' $(($1/3600)) $(($1%3600/60))
 	elif [ $1 -lt 172800 ]; then
 		printf '1 day %02d:%02d' $(($1%86400/3600)) $(($1%3600/60))
@@ -305,12 +307,16 @@ formatted_Time() {
 
 
 formatted_File_Age() {
-	formatted_Time $(($(date +%s) - $(date +%s -r "$1" 2>/dev/null || echo $start_time)))
+	if [ -r "$1" ]; then
+		formatted_Time $(($(date +%s) - $(date +%s -r "$1")))
+	fi
 }
 
 
 file_Age() {
-	echo $(($(date +%s) - $(date +%s -r "$1" 2>/dev/null || echo $start_time)))
+	if [ -r "$1" ]; then
+		printf $(($(date +%s) - $(date +%s -r "$1")))
+	fi
 }
 
 
@@ -651,7 +657,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.6.4"
+version="3.6.5"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
@@ -878,8 +884,11 @@ case "$command" in
 		header "Blocklist" "Average update time"
 		true > "$dir_temp/file.csv"
 		filter_Skynet_Set < "$dir_system/lookup.csv" | while IFS=, read -r setname comment; do
-			n=$(head -1 "$dir_update/$setname" 2>/dev/null || echo 1)
-			sec=$(($(file_Age "$dir_system/installtime") / n))
+			sec=''
+			n=$(head -1 "$dir_update/$setname" 2>/dev/null || echo 0)
+			if [ $n -gt 0 ]; then
+				sec=$(($(file_Age "$dir_system/installtime") / n))
+			fi
 			echo "$comment,$(formatted_Time "$sec"),$sec" >> "$dir_temp/file.csv"
 		done
 		sort -t, -k3n < "$dir_temp/file.csv" | awk -F, '{printf " %-40s  %15s\n", $1, $2}'
