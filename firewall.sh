@@ -289,12 +289,12 @@ lookup_Comment() {
 
 
 formatted_Number() {
-	echo $1 | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'
+	echo -n $1 | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'
 }
 
 
 formatted_Time() {
-	if [ "$1" != $(($1)) ]; then
+	if ! [ "$1" -ge 0 ] 2>/dev/null; then
 		printf 'undefined'
 	elif [ $1 -lt 86400 ]; then
 		printf '%02d:%02d' $(($1/3600)) $(($1%3600/60))
@@ -315,7 +315,7 @@ formatted_File_Age() {
 
 file_Age() {
 	if [ -r "$1" ]; then
-		printf $(($(date +%s) - $(date +%s -r "$1")))
+		echo -n $(($(date +%s) - $(date +%s -r "$1")))
 	fi
 }
 
@@ -334,13 +334,13 @@ hash_Unmodified() {
 
 update_Counter() {
 	local n=$(head -1 "$1" 2>/dev/null)
-	echo $((n + 1)) | tee "$1"
+	echo -n $((n + 1)) | tee "$1"
 }
 
 
 rand() {
 	local min=$1 max=$2
-	echo $((min + $(printf '%d' 0x$(openssl rand -hex 2)) * (max - min + 1) / 65025))
+	echo -n $((min + $(printf '%d' 0x$(openssl rand -hex 2)) * (max - min + 1) / 65025))
 }
 
 
@@ -531,9 +531,9 @@ load_Set() {
 		"$(wc -l < "$filtered_temp")" \
 		"-$(wc -l < "$dir_temp/del")" \
 		"+$(wc -l < "$dir_temp/add")" >> "$dir_debug/$comment.log"
-	log_Tail "$dir_debug/$comment.log"
 	update_Counter "$dir_update/$setname" >/dev/null
 	rm -f "$dir_temp/diff" "$dir_temp/add" "$dir_temp/del"
+	log_Tail "$dir_debug/$comment.log"
 }
 
 
@@ -657,18 +657,18 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.6.5"
+version="3.6.6"
 useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/tmp/var/lock/skynet.lock"
 
 dir_skynet="/tmp/skynet"
-dir_cache="$dir_skynet/cache"
-dir_debug="$dir_skynet/debug"
-dir_filtered="$dir_skynet/filtered"
-dir_reload="$dir_skynet/reload"
-dir_system="$dir_skynet/system"
-dir_temp="$dir_skynet/temp"
-dir_update="$dir_skynet/update"
+dir_cache="$dir_skynet/cache_"
+dir_debug="$dir_skynet/debug_"
+dir_filtered="$dir_skynet/filtered_"
+dir_reload="$dir_skynet/reload_"
+dir_system="$dir_skynet/system_"
+dir_temp="$dir_skynet/temp_"
+dir_update="$dir_skynet/update_" # with firmware 386.1 directory update will be deleted after 24 hours!
 mkdir -p "$dir_cache" "$dir_debug" "$dir_filtered" "$dir_reload"
 mkdir -p "$dir_system" "$dir_temp" "$dir_update"
 
@@ -884,9 +884,9 @@ case "$command" in
 		header "Blocklist" "Average update time"
 		true > "$dir_temp/file.csv"
 		filter_Skynet_Set < "$dir_system/lookup.csv" | while IFS=, read -r setname comment; do
-			sec=''
-			n=$(head -1 "$dir_update/$setname" 2>/dev/null || echo 0)
-			if [ $n -gt 0 ]; then
+			sec=-1
+			n=$(head -1 "$dir_update/$setname" 2>/dev/null)
+			if [ "$n" -gt 0 ] 2>/dev/null; then
 				sec=$(($(file_Age "$dir_system/installtime") / n))
 			fi
 			echo "$comment,$(formatted_Time "$sec"),$sec" >> "$dir_temp/file.csv"
