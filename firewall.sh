@@ -649,9 +649,9 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.6.7"
-useragent="Skynet-Lite/$version (Linux) https://github.com/wbartels/IPSet_ASUS_Lite"
-lockfile="/tmp/var/lock/skynet.lock"
+version="3.6.8"
+useragent="$(curl -V | grep -Eo '^curl.+)') Skynet-Lite/$version https://github.com/wbartels/IPSet_ASUS_Lite"
+lockfile="/var/lock/skynet.lock"
 
 dir_skynet="/tmp/skynet"
 dir_cache="$dir_skynet/cache_"
