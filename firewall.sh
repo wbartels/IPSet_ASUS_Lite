@@ -25,8 +25,8 @@
 # The cron job is started every 15 minutes.
 # By default, the set update process is started after 4 cycles = 1 hour.
 # This value can be overridden per set with the tag {n}.
-# If the download fails, this set will be retried at an interval of 15 minutes.
-# Over time, the interval is extended to a maximum of 6 hours.
+# If a download fails, this set will be retried at an interval of 15 minutes.
+# Over time, the interval will be extended to a maximum of 6 hours.
 #
 # Both the <comment> and {n} tags are optional.
 # The order of the url and tags are not important, but must be on the same line.
@@ -51,11 +51,9 @@ blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {1}
 					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<maxmind>				https://www.maxmind.com/en/high-risk-ip-sample-list  {48}
 					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
-					<talosintel>			https://talosintelligence.com/documents/ip-blacklist  {12}
 					<tor_exits>				https://iplists.firehol.org/files/tor_exits.ipset  {1}"
 blocklist_ip=""
 blocklist_domain=""
@@ -330,10 +328,10 @@ update_Counter() {
 }
 
 
-rand() {
-	local min=$1 max=$2
-	echo -n $((min + $(printf '%d' 0x$(openssl rand -hex 2)) * (max - min + 1) / 65025))
-}
+# rand() {
+#	local min=$1 max=$2
+#	echo -n $((min + $(printf '%d' 0x$(openssl rand -hex 2)) * (max - min + 1) / 65025))
+# }
 
 
 header() {
@@ -561,11 +559,12 @@ download_Set() {
 			ipset add Skynet-Primary "$setname" comment "$comment"
 		fi
 		if [ -f "$dir_reload/$setname" ]; then
-			update_cycles=1
 			if [ $(head -1 "$dir_reload/$setname" 2>/dev/null) -ge 27 ]; then
 				update_cycles=24
 			elif [ $(head -1 "$dir_reload/$setname" 2>/dev/null) -ge 4 ]; then
 				update_cycles=4
+			else
+				update_cycles=1
 			fi
 		fi
 		if [ $((updatecount % update_cycles)) -ne 0 ]; then
@@ -649,7 +648,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.6.8"
+version="3.6.9"
 useragent="$(curl -V | grep -Eo '^curl.+)') Skynet-Lite/$version https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/var/lock/skynet.lock"
 
@@ -732,6 +731,7 @@ case "$command" in
 	reset)
 		header "Reset"
 		log_Skynet "[i] Install"
+		cru d Skynet_update
 		rm -f "$dir_cache/"* "$dir_debug/"* "$dir_filtered/"* "$dir_reload/"*
 		rm -f "$dir_system/"* "$dir_temp/"* "$dir_update/"*
 		true > "$dir_skynet/warning.log"
@@ -750,9 +750,6 @@ case "$command" in
 			chmod 755 "/jffs/scripts/firewall-start"
 			echo "/jffs/scripts/firewall" >> "/jffs/scripts/firewall-start"
 		fi
-		rand=$(rand 1 14)
-		cru d Skynet_update
-		cru a Skynet_update "$((rand + 0)),$((rand + 15)),$((rand + 30)),$((rand + 45)) * * * * nice -n 19 /jffs/scripts/firewall update cru"
 		unload_IPTables
 		unload_LogIPTables
 		unload_IPSets
@@ -771,6 +768,9 @@ case "$command" in
 		load_Domain
 		load_ASN
 		download_Set
+		update_Counter "$dir_system/updatecount" >/dev/null
+		minutes=$((($(date +%M) + 13) % 15))
+		cru a Skynet_update "$((minutes + 0)),$((minutes + 15)),$((minutes + 30)),$((minutes + 45)) * * * * nice -n 19 /jffs/scripts/firewall update cru"
 		footer
 	;;
 
