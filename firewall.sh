@@ -648,7 +648,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.6.9"
+version="3.6.10"
 useragent="$(curl -V | grep -Eo '^curl.+)') Skynet-Lite/$version https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/var/lock/skynet.lock"
 
@@ -737,7 +737,6 @@ case "$command" in
 		true > "$dir_skynet/warning.log"
 		true > "$dir_skynet/error.log"
 		touch "$dir_system/installtime"
-		lookup_Comment_Init
 		if [ "$0" != "/jffs/scripts/firewall" ]; then
 			mv -f "$0" "/jffs/scripts/firewall"
 			log_Skynet "[!] Skynet Lite moved to /jffs/scripts/firewall"
@@ -763,14 +762,15 @@ case "$command" in
 			add Skynet-Primary Skynet-ASN comment "blocklist_asn"' | tr -d '\t' | ipset restore -!
 		load_IPTables
 		load_LogIPTables
+		minutes=$((($(date +%M) + 15) % 15))
+		lookup_Comment_Init
 		load_Passlist
 		load_Blocklist
 		load_Domain
 		load_ASN
 		download_Set
-		update_Counter "$dir_system/updatecount" >/dev/null
-		minutes=$((($(date +%M) + 13) % 15))
 		cru a Skynet_update "$((minutes + 0)),$((minutes + 15)),$((minutes + 30)),$((minutes + 45)) * * * * nice -n 19 /jffs/scripts/firewall update cru"
+		update_Counter "$dir_system/updatecount" >/dev/null
 		footer
 	;;
 
