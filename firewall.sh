@@ -648,7 +648,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.6.10"
+version="3.6.11"
 useragent="$(curl -V | grep -Eo '^curl.+)') Skynet-Lite/$version https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/var/lock/skynet.lock"
 
@@ -762,7 +762,7 @@ case "$command" in
 			add Skynet-Primary Skynet-ASN comment "blocklist_asn"' | tr -d '\t' | ipset restore -!
 		load_IPTables
 		load_LogIPTables
-		minutes=$((($(date +%M) + 15) % 15))
+		minutes=$(($(date +%M) % 15))
 		lookup_Comment_Init
 		load_Passlist
 		load_Blocklist
@@ -790,12 +790,12 @@ case "$command" in
 	uninstall)
 		header "Uninstall"
 		log_Skynet "[*] Uninstall Skynet Lite..."
+		cru d Skynet_update
 		if [ -f "/jffs/scripts/firewall-start" ]; then
 			chmod 755 "/jffs/scripts/firewall-start"
 			config=$(grep -v "/jffs/scripts/firewall" "/jffs/scripts/firewall-start")
 			echo "$config" > "/jffs/scripts/firewall-start"
 		fi
-		cru d Skynet_update
 		unload_IPTables
 		unload_LogIPTables
 		unload_IPSets
