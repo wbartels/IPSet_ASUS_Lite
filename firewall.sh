@@ -395,8 +395,11 @@ load_Passlist() {
 		add Skynet-Temp 198.51.100.0/24 comment \"Passlist: TEST-NET-2\"
 		add Skynet-Temp 203.0.113.0/24 comment \"Passlist: TEST-NET-3\"
 		add Skynet-Temp 224.0.0.0/3 comment \"Passlist: Multicast/reserved/limited broadcast\""
-	local passlist_domain="$passlist_domain $(echo "$blocklist_set $(nvram get firmware_server)" | strip_Domain)
-		$(nvram get ntp_server0) $(nvram get ntp_server1)
+	local passlist_domain="$passlist_domain
+		$(echo "$blocklist_set $(nvram get firmware_server) $(nvram get ntp_server0) $(nvram get ntp_server1)" | strip_Domain)
+		fastly.com
+		github.com
+		ibm.com
 		ipinfo.io
 		raw.githubusercontent.com
 		www.internic.net"
@@ -647,7 +650,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.6.12"
+version="3.6.13"
 useragent="$(curl -V | grep -Eo '^curl.+)') Skynet-Lite/$version https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/var/lock/skynet.lock"
 
@@ -681,9 +684,9 @@ done
 
 if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 	for i in 1 2 3 4 5 6; do
-		if ping -q -w1 -c1 dns.google >/dev/null 2>&1; then break; fi
-		if ping -q -w1 -c1 one.one.one.one >/dev/null 2>&1; then break; fi
-		if ping -q -w1 -c1 dns.opendns.com >/dev/null 2>&1; then break; fi
+		if ping -q -w1 -c1 ibm.com >/dev/null 2>&1; then break; fi
+		if ping -q -w1 -c1 fastly.com >/dev/null 2>&1; then break; fi
+		if ping -q -w1 -c1 github.com >/dev/null 2>&1; then break; fi
 		if [ $i -eq 1 ]; then log_Skynet "[!] Waiting for internet connectivity..."; fi
 		if [ $i -eq 6 ]; then log_Skynet "[*] Internet connectivity error"; echo; exit 1; fi
 		sleep 9
