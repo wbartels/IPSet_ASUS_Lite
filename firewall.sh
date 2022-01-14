@@ -6,11 +6,11 @@
 #          |__/
 #
 #   Skynet Lite by Willem Bartels
-#   IP Blocking For ASUS Routers Using IPSet
+#   IP Blocking for ASUS Routers Using IPSet
 #   https://github.com/wbartels/IPSet_ASUS_Lite
 #
-#   Code is based on Skynet By Adamm
-#   Advanced IP Blocking For ASUS Routers Using IPSet
+#   Code is based on Skynet by Adamm
+#   Advanced IP Blocking for ASUS Routers using IPSet
 #   https://github.com/Adamm00/IPSet_ASUS
 #   This script will always be open source and free to use
 #
@@ -24,12 +24,18 @@
 # Readme:
 # The cron job is started every 15 minutes.
 # By default, the set update process is started after 4 cycles = 1 hour.
-# This value can be overridden per set with the tag {n}.
+# This value can be overridden per set with the {n} tag.
+# If supported only changed files will be downloaded, see URL's for more info.
+# This way the update frequencies can be relative high without overloading the servers.
+#
+# https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-Modified-Since
+# https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/304
+#
 # If a download fails, this set will be retried at an interval of 15 minutes.
 # Over time, the interval will be extended to a maximum of 6 hours.
 #
 # Both the <comment> and {n} tags are optional.
-# The order of the url and tags are not important, but must be on the same line.
+# The order of the URL and tags are not important, but must be on the same line.
 #
 # The other lists (ip, domain and asn) can contain multiple items per list.
 # The items on these lists must be separated with a space, tab or newline.
@@ -45,16 +51,16 @@ filtertraffic="all"		# inbound | outbound | all
 logmode="enabled"		# enabled | disabled
 loginvalid="disabled"	# enabled | disabled
 
-blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
-					<blocklist.de>			https://iplists.firehol.org/files/blocklist_de.ipset  {1}
-					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {1}
+blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {2}
+					<blocklist.de>			https://lists.blocklist.de/lists/all.txt  {2}
+					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {2}
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
 					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {1}
-					<greensnow>				https://iplists.firehol.org/files/greensnow.ipset  {1}
-					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
+					<greensnow>				https://blocklist.greensnow.co/greensnow.txt  {2}
+					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {2}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
-					<tor_exits>				https://iplists.firehol.org/files/tor_exits.ipset  {1}"
+					<tor_exits>				https://check.torproject.org/exit-addresses  {4}"
 blocklist_ip=""
 blocklist_domain=""
 blocklist_asn=""
@@ -146,7 +152,7 @@ strip_Domain() {
 
 
 filter_Domain() {
-	awk '{gsub("<.+>", ""); print}' | grep -Eo '(([a-z](-?[a-z0-9])*)\.)+[a-z]{2,}'
+	awk '{gsub("<.+>", ""); print}' | grep -Eo '(([a-z][a-z0-9-]*)\.)+[a-z]{2,}'
 }
 
 
@@ -425,7 +431,7 @@ load_Passlist() {
 	cache="$dir_cache/named.root"
 
 	http_code=$(curl -sf --location --user-agent "$useragent" \
-		--connect-timeout 10 --max-time 90 --limit-rate "$throttle" \
+		--connect-timeout 5 --max-time 90 --limit-rate "$throttle" \
 		--write-out "%{http_code}" --output "$temp" \
 		--remote-time --time-cond "$cache" \
 		--header "Accept-encoding: gzip" "$url"); curl_exit=$?
@@ -485,7 +491,7 @@ load_ASN() {
 			temp="$dir_temp/$asn"
 
 			http_code=$(curl -sf --location --user-agent "$useragent" \
-				--connect-timeout 10 --max-time 90 --limit-rate "$throttle" \
+				--connect-timeout 5 --max-time 90 --limit-rate "$throttle" \
 				--write-out "%{http_code}" --output "$temp" \
 				--header "Accept-encoding: gzip" "$url"); curl_exit=$?
 
@@ -580,7 +586,7 @@ download_Set() {
 		filtered_cache="$dir_filtered/$setname"
 
 		http_code=$(curl -sf --location --user-agent "$useragent" \
-			--connect-timeout 10 --max-time 90 --limit-rate "$throttle" \
+			--connect-timeout 5 --max-time 90 --limit-rate "$throttle" \
 			--write-out "%{http_code}" --output "$temp" \
 			--remote-time --time-cond "$cache" \
 			--header "Accept-encoding: gzip" "$url"); curl_exit=$?
@@ -650,7 +656,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.6.13"
+version="3.6.14"
 useragent="$(curl -V | grep -Eo '^curl.+)') Skynet-Lite/$version https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/var/lock/skynet.lock"
 
