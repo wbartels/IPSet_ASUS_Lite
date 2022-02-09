@@ -25,10 +25,11 @@
 # The cron job is started every 15 minutes.
 # By default, the set update process is started after 4 cycles = 1 hour.
 # This value can be overridden per set with the {n} tag.
-# If supported only changed files will be downloaded, see URL's for more info.
+# If supported only changed files will be downloaded, see URL's below for more info.
 # This way the update frequencies can be relative high without overloading the servers.
 #
 # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-Modified-Since
+# https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-None-Match
 # https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/304
 #
 # If a download fails, this set will be retried at an interval of 15 minutes.
@@ -37,10 +38,14 @@
 # Both the <comment> and {n} tags are optional.
 # The order of the URL and tags are not important, but must be on the same line.
 #
-# The other lists (ip, domain and asn) can contain multiple items per list.
+# The other lists (ip and domain) can contain multiple items per list.
 # The items on these lists must be separated with a space, tab or newline.
-# blocklist_ip, blocklist_domain, blocklist_asn and passlist_ip can optionally use one <comment> tag per list.
+# blocklist_ip, blocklist_domain and passlist_ip can optionally use one <comment> tag per list.
 #
+# feb 2022: Torproject tor-exits aren't updated for months.
+# Thanks https://github.com/SecOps-Institute for creating a tor-exit-nodes list.
+#
+
 
 ###################
 #- Configuration -#
@@ -54,16 +59,16 @@ loginvalid="disabled"	# enabled | disabled
 blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {2}
 					<blocklist.de>			https://lists.blocklist.de/lists/all.txt  {2}
 					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {2}
-					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {1}
-					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {1}
+					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {2}
+					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {2}
 					<greensnow>				https://blocklist.greensnow.co/greensnow.txt  {2}
 					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {2}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
-					<tor_exits>				https://check.torproject.org/exit-addresses  {4}"
+					<tor_exits>				https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst  {4}"
 blocklist_ip=""
 blocklist_domain=""
-blocklist_asn=""
+
 passlist_ip=""
 passlist_domain="	dns.adguard.com
 					dns.cloudflare.com
@@ -152,12 +157,12 @@ strip_Domain() {
 
 
 filter_Domain() {
-	awk '{gsub("<.+>", ""); print}' | grep -Eo '(([a-z][a-z0-9-]*)\.)+[a-z]{2,}'
+	awk '{gsub("<.+>", ""); print}' | grep -Eo '(([a-z][a-z0-9-]*)\.)+[a-z]{2,62}'
 }
 
 
 is_Domain() {
-	grep -Eo '^(([a-z](-?[a-z0-9])*)\.)+[a-z]{2,}$'
+	grep -Eo '^(([a-z][a-z0-9-]*)\.)+[a-z]{2,62}$'
 }
 
 
@@ -189,11 +194,6 @@ filter_IP_Line() {
 
 is_IP() {
 	grep -Eo '^(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])){3}$'
-}
-
-
-filter_ASN() {
-	grep -Eo 'AS[1-9][0-9]{2,9}'
 }
 
 
@@ -281,7 +281,6 @@ lookup_Comment_Init() {
  	echo "Skynet-Passlist,$(echo "$passlist_ip" | filter_Comment || echo "passlist")" > "$dir_temp/lookup.csv"
  	echo "Skynet-Blocklist,$(echo "$blocklist_ip" | filter_Comment || echo "blocklist_ip")" >> "$dir_temp/lookup.csv"
 	echo "Skynet-Domain,$(echo "$blocklist_domain" | filter_Comment || echo "blocklist_domain")" >> "$dir_temp/lookup.csv"
-	echo "Skynet-ASN,$(echo "$blocklist_asn" | filter_Comment || echo "blocklist_asn")" >> "$dir_temp/lookup.csv"
 }
 
 
@@ -406,13 +405,12 @@ load_Passlist() {
 		fastly.com
 		github.com
 		ibm.com
-		ipinfo.io
 		raw.githubusercontent.com
 		www.internic.net"
 
-	if [ $((updatecount % 48)) -ne 0 ] && hash_Unmodified "$passlist_router $passlist_ip $passlist_domain" "passlist"; then return; fi
+	if [ $((updatecount % 96)) -ne 0 ] && hash_Unmodified "$passlist_router $passlist_ip $passlist_domain" "passlist"; then return; fi
 	log_Skynet "[i] Update $(lookup_Comment 'Skynet-Passlist')"
-	local cache= curl_exit= domain= http_code= n=0 temp= url=
+	local cache= curl_exit= domain= etag= etag_temp= n=0 response_code= temp= url=
 	ipset -q destroy "Skynet-Temp"
 	ipset create Skynet-Temp hash:net comment
 	# Passlist router and reserved IP addresses:
@@ -427,22 +425,29 @@ load_Passlist() {
 	wait
 	# Passlist root hints:
 	url="http://www.internic.net/domain/named.root"
-	temp="$dir_temp/named.root"; touch "$temp"
-	cache="$dir_cache/named.root"
+	temp="$dir_temp/namedroot"; touch "$temp"
+	cache="$dir_cache/namedroot"
+	etag_temp="$dir_temp/namedroot_etag"
+	etag="$dir_etag/namedroot"; touch "$etag"
 
-	http_code=$(curl -sf --location --user-agent "$useragent" \
-		--connect-timeout 5 --max-time 90 --limit-rate "$throttle" \
-		--write-out "%{http_code}" --output "$temp" \
+	response_code=$(curl -sf --location \
+		--limit-rate "$throttle" --user-agent "$useragent" \
+		--connect-timeout 5 --retry 3 --retry-max-time 60 \
 		--remote-time --time-cond "$cache" \
+		--etag-compare "$etag" --etag-save "$etag_temp" \
+		--write-out "%{response_code}" --output "$temp" \
 		--header "Accept-encoding: gzip" "$url"); curl_exit=$?
 
-	if [ $curl_exit -eq 0 ] && [ "$http_code" = "200" ]; then
+	if [ "$response_code" = "200" ] || [ "$response_code" = "304" ]; then
 		mv -f "$temp" "$cache"
+		mv -f "$etag_temp" "$etag"
+	else
+		log_Skynet "$(download_Error $curl_exit $response_code) $url"
 	fi
 	if [ -f "$cache" ]; then
 		{ gunzip -c "$cache" 2>/dev/null || cat "$cache"; } | filter_IP_CIDR | filter_Out_PrivateIP | awk '!x[$0]++' | awk '{printf "add Skynet-Temp %s comment \"Passlist: Root hints\"\n", $1}' | ipset restore -!
 	fi
-	rm -f "$temp";
+	rm -f "$temp" "$etag_temp";
 	ipset swap "Skynet-Passlist" "Skynet-Temp"
 	ipset destroy "Skynet-Temp"
 	hash_Set "$passlist_router $passlist_ip $passlist_domain" "passlist"
@@ -478,48 +483,7 @@ load_Domain() {
 }
 
 
-load_ASN() {
-	if [ $((updatecount % 48)) -ne 0 ] && [ ! -f "$dir_reload/asn" ] && hash_Unmodified "$blocklist_asn" "blocklist_asn"; then return; fi
-	log_Skynet "[i] Update $(lookup_Comment 'Skynet-ASN')"
-	local asn= n=0
-	rm -f "$dir_reload/asn"
-	ipset -q destroy "Skynet-Temp"
-	ipset create "Skynet-Temp" hash:net comment
-	for asn in $(echo "$blocklist_asn" | filter_ASN); do
-		(
-			url="https://ipinfo.io/$asn"
-			temp="$dir_temp/$asn"
-
-			http_code=$(curl -sf --location --user-agent "$useragent" \
-				--connect-timeout 5 --max-time 90 --limit-rate "$throttle" \
-				--write-out "%{http_code}" --output "$temp" \
-				--header "Accept-encoding: gzip" "$url"); curl_exit=$?
-
-			if [ $curl_exit -eq 0 ]; then
-				{ gunzip -c "$temp" 2>/dev/null || cat "$temp"; } | filter_IP_CIDR | filter_Out_PrivateIP | awk '!x[$0]++' | awk -v asn="$asn" '{printf "add Skynet-Temp %s comment \"Blocklist: %s\"\n", $1, asn}' | ipset restore -!
-			elif [ "$http_code" = "429" ]; then
-				log_Skynet "$(download_Error $curl_exit $http_code) $url"
-				touch "$dir_temp/asn_too_many_requests"
-				rm -f "$dir_reload/asn"
-			else
-				log_Skynet "$(download_Error $curl_exit $http_code) $url"
-				touch "$dir_reload/asn"
-			fi
-			rm -f "$temp"
-		) &
-		n=$((n + 1)); if [ $((n % 10)) -eq 0 ]; then wait; fi
-		if [ -f "$dir_reload/asn" ] || [ -f "$dir_temp/asn_too_many_requests" ]; then ipset destroy "Skynet-Temp"; return; fi
-	done
-	wait
-	if [ -f "$dir_reload/asn" ] || [ -f "$dir_temp/asn_too_many_requests" ]; then ipset destroy "Skynet-Temp"; return; fi
-	ipset swap "Skynet-ASN" "Skynet-Temp"
-	ipset destroy "Skynet-Temp"
-	hash_Set "$blocklist_asn" "blocklist_asn"
-}
-
-
 load_Set() {
-	log_Skynet "[i] Update $comment"
 	grep -E '^[+][0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/add"
 	grep -E '^[-][0-9]' < "$dir_temp/diff" | cut -c2- > "$dir_temp/del"
 	awk -v setname="$setname" -v comment="$comment" '{printf "add %s %s comment \"Blocklist: %s\"\n", setname, $1, comment}' "$dir_temp/add" | ipset restore -!
@@ -552,7 +516,7 @@ compare_Set() {
 
 
 download_Set() {
-	local cache= comment= curl_exit= dir= filtered_cache= filtered_temp= http_code= line= list= lookup= setname= temp= update_cycles= url=
+	local cache= comment= curl_exit= dir= etag= etag_temp= filtered_cache= filtered_temp= line= list= lookup= setname= response_code= temp= update_cycles= url=
 	echo "$blocklist_set" | filter_URL_Line > "$dir_temp/blocklist_set"
 
 	while IFS= read -r line; do
@@ -582,37 +546,45 @@ download_Set() {
 		echo " [i] Download $comment"
 		temp="$dir_temp/${setname}_unfiltered"; touch "$temp"
 		cache="$dir_cache/$setname"
+		etag_temp="$dir_temp/${setname}_etag"
+		etag="$dir_etag/$setname"; touch "$etag"
 		filtered_temp="$dir_temp/${setname}_filtered"
 		filtered_cache="$dir_filtered/$setname"
 
-		http_code=$(curl -sf --location --user-agent "$useragent" \
-			--connect-timeout 5 --max-time 90 --limit-rate "$throttle" \
-			--write-out "%{http_code}" --output "$temp" \
+		response_code=$(curl -sf --location \
+			--limit-rate "$throttle" --user-agent "$useragent" \
+			--connect-timeout 5 --retry 3 --retry-max-time 60 \
 			--remote-time --time-cond "$cache" \
+			--etag-compare "$etag" --etag-save "$etag_temp" \
+			--write-out "%{response_code}" --output "$temp" \
 			--header "Accept-encoding: gzip" "$url"); curl_exit=$?
 		printf '\033[1A\033[K' # cursor up and clear
 
 		if [ $curl_exit -eq 0 ]; then
-			if [ "$http_code" = "304" ]; then
+			if [ "$response_code" = "304" ]; then
 				log_Skynet "[i] Fresh $comment"
-			elif compare_Set && [ -f "$cache" ]; then
+			elif compare_Set && [ -s "$cache" ]; then
 				log_Skynet "[!] Redownload $comment"
 				mv -f "$temp" "$cache"
+				mv -f "$filtered_temp" "$filtered_cache"
+				mv -f "$etag_temp" "$etag"
 			else
+				log_Skynet "[i] Update $comment"
 				load_Set
 				mv -f "$temp" "$cache"
 				mv -f "$filtered_temp" "$filtered_cache"
+				mv -f "$etag_temp" "$etag"
 			fi
 			rm -f "$dir_reload/$setname"
 		else
-			log_Skynet "$(download_Error $curl_exit $http_code) $url"
-			if [ "$http_code" = "429" ]; then
+			log_Skynet "$(download_Error $curl_exit $response_code) $url"
+			if [ "$response_code" = "429" ]; then
 				echo "99" > "$dir_reload/$setname"
 			else
 				update_Counter "$dir_reload/$setname" >/dev/null
 			fi
 		fi
-		rm -f "$temp" "$filtered_temp"
+		rm -f "$temp" "$filtered_temp" "$etag_temp"
 	done < "$dir_temp/blocklist_set"
 	sort -t, -k2 < "$dir_temp/lookup.csv" > "$dir_system/lookup.csv"
 
@@ -626,7 +598,7 @@ download_Set() {
 		fi
 	done
 	# Cleanup directories
-	for dir in "$dir_cache" "$dir_filtered" "$dir_reload" "$dir_update"; do
+	for dir in "$dir_cache" "$dir_etag" "$dir_filtered" "$dir_reload" "$dir_update"; do
 		cd "$dir"
 		for setname in $(ls -1 | filter_Skynet_Set); do
 			if ! echo "$list" | grep -q "$setname"; then
@@ -656,20 +628,21 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.6.14"
+version="3.7.0"
 useragent="$(curl -V | grep -Eo '^curl.+)') Skynet-Lite/$version https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/var/lock/skynet.lock"
 
 dir_skynet="/tmp/skynet"
-dir_cache="$dir_skynet/cache_"
-dir_debug="$dir_skynet/debug_"
-dir_filtered="$dir_skynet/filtered_"
-dir_reload="$dir_skynet/reload_"
-dir_system="$dir_skynet/system_"
-dir_temp="$dir_skynet/temp_"
-dir_update="$dir_skynet/update_" # with firmware 386.1 directory update will be deleted after 24 hours!
-mkdir -p "$dir_cache" "$dir_debug" "$dir_filtered" "$dir_reload"
-mkdir -p "$dir_system" "$dir_temp" "$dir_update"
+dir_cache="$dir_skynet/cache"
+dir_debug="$dir_skynet/debug"
+dir_etag="$dir_skynet/etag"
+dir_filtered="$dir_skynet/filtered"
+dir_reload="$dir_skynet/reload"
+dir_system="$dir_skynet/system"
+dir_temp="$dir_skynet/temp"
+dir_update="$dir_skynet/update_" # with firmware 386.1 directory 'update' will be deleted after 24 hours!
+mkdir -p "$dir_cache" "$dir_debug" "$dir_etag" "$dir_filtered"
+mkdir -p "$dir_reload" "$dir_system" "$dir_temp" "$dir_update"
 
 
 domain=$(echo "$command" | is_Domain) && command="domain"
@@ -714,7 +687,7 @@ fi
 
 
 if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
-	throttle="2M"
+	throttle="5M"
 	updatecount=$(update_Counter "$dir_system/updatecount")
 fi
 
@@ -739,9 +712,9 @@ case "$command" in
 	reset)
 		header "Reset"
 		log_Skynet "[i] Install"
-		cru d Skynet_update
-		rm -f "$dir_cache/"* "$dir_debug/"* "$dir_filtered/"* "$dir_reload/"*
-		rm -f "$dir_system/"* "$dir_temp/"* "$dir_update/"*
+		cru d Skynet_update; minutes=$(($(date +%M) % 15))
+		rm -f "$dir_cache/"* "$dir_debug/"* "$dir_etag/"* "$dir_filtered/"*
+		rm -f "$dir_reload/"* "$dir_system/"* "$dir_temp/"* "$dir_update/"*
 		true > "$dir_skynet/warning.log"
 		true > "$dir_skynet/error.log"
 		touch "$dir_system/installtime"
@@ -764,18 +737,14 @@ case "$command" in
 			create Skynet-Primary list:set size 64 comment counters
 			create Skynet-Blocklist hash:net comment
 			create Skynet-Domain hash:net comment
-			create Skynet-ASN hash:net comment
 			add Skynet-Primary Skynet-Blocklist comment "blocklist_ip"
-			add Skynet-Primary Skynet-Domain comment "blocklist_domain"
-			add Skynet-Primary Skynet-ASN comment "blocklist_asn"' | tr -d '\t' | ipset restore -!
+			add Skynet-Primary Skynet-Domain comment "blocklist_domain"' | tr -d '\t' | ipset restore -!
 		load_IPTables
 		load_LogIPTables
-		minutes=$(($(date +%M) % 15))
 		lookup_Comment_Init
 		load_Passlist
 		load_Blocklist
 		load_Domain
-		load_ASN
 		download_Set
 		cru a Skynet_update "$((minutes + 0)),$((minutes + 15)),$((minutes + 30)),$((minutes + 45)) * * * * nice -n 19 /jffs/scripts/firewall update cru"
 		update_Counter "$dir_system/updatecount" >/dev/null
@@ -789,7 +758,6 @@ case "$command" in
 		load_Passlist
 		load_Blocklist
 		load_Domain
-		load_ASN
 		download_Set
 		footer
 	;;
