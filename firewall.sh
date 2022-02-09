@@ -62,10 +62,10 @@ blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {2
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {2}
 					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {2}
 					<greensnow>				https://blocklist.greensnow.co/greensnow.txt  {2}
-					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {2}
+					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
-					<tor_exits>				https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst  {4}"
+					<tor_exits>				https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst  {2}"
 blocklist_ip=""
 blocklist_domain=""
 
@@ -628,7 +628,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.7.0"
+version="3.7.1"
 useragent="$(curl -V | grep -Eo '^curl.+)') Skynet-Lite/$version https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/var/lock/skynet.lock"
 
@@ -909,3 +909,4 @@ esac
 rm -f "$dir_temp/"*
 log_Tail "$dir_skynet/warning.log"
 log_Tail "$dir_skynet/error.log"
+
