@@ -64,8 +64,7 @@ blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {1
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
 					<tor_exits>				https://check.torproject.org/exit-addresses  {1}
-					<tor_exits_fallback>	ZZZZZ://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst  {1}
-					<kerio>					http://192.168.1.2/skynet/blocklist_kerio.txt  {1}"
+					<tor_exits_fallback>	ZZZZZ://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst  {1}"
 blocklist_ip=""
 blocklist_domain=""
 
