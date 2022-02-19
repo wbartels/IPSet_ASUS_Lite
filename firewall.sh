@@ -26,7 +26,7 @@
 # By default, the set update process is started after 4 cycles = 1 hour.
 # This value can be overridden per set with the {n} tag.
 # If supported only changed files will be downloaded, see URL's below for more info.
-# This way the update frequencies can be relative high without overloading the servers.
+# This way the update check frequencies can be relative high without overloading the servers.
 #
 # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-Modified-Since
 # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-None-Match
@@ -42,9 +42,7 @@
 # The items on these lists must be separated with a space, tab or newline.
 # blocklist_ip, blocklist_domain and passlist_ip can optionally use one <comment> tag per list.
 #
-# feb 2022: Torproject tor-exits aren't updated for months.
-# Thanks https://github.com/SecOps-Institute for creating a tor-exit-nodes list.
-#
+
 
 
 ###################
@@ -56,16 +54,18 @@ filtertraffic="all"		# inbound | outbound | all
 logmode="enabled"		# enabled | disabled
 loginvalid="disabled"	# enabled | disabled
 
-blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {2}
-					<blocklist.de>			https://lists.blocklist.de/lists/all.txt  {2}
-					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {2}
-					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {2}
-					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {2}
-					<greensnow>				https://blocklist.greensnow.co/greensnow.txt  {2}
-					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
+blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {1}
+					<blocklist.de>			https://lists.blocklist.de/lists/all.txt  {1}
+					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {1}
+					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
+					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {4}
+					<greensnow>				https://blocklist.greensnow.co/greensnow.txt  {1}
+					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
-					<tor_exits>				https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst  {2}"
+					<tor_exits>				https://check.torproject.org/exit-addresses  {1}
+					<tor_exits_fallback>	ZZZZZ://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst  {1}
+					<kerio>					http://192.168.1.2/skynet/blocklist_kerio.txt  {1}"
 blocklist_ip=""
 blocklist_domain=""
 
@@ -157,12 +157,12 @@ strip_Domain() {
 
 
 filter_Domain() {
-	awk '{gsub("<.+>", ""); print}' | grep -Eo '(([a-z][a-z0-9-]*)\.)+[a-z]{2,62}'
+	awk '{gsub("<.+>", ""); print}' | grep -Eo '([a-z0-9-]+\.)+(xn--[a-z0-9-]{4,}|[a-z]{2,})'
 }
 
 
 is_Domain() {
-	grep -Eo '^(([a-z][a-z0-9-]*)\.)+[a-z]{2,62}$'
+	grep -Eo '^([a-z0-9-]+\.)+(xn--[a-z0-9-]{4,}|[a-z]{2,})$'
 }
 
 
@@ -340,8 +340,8 @@ update_Counter() {
 
 
 # rand() {
-#	local min=$1 max=$2
-#	echo -n $((min + $(printf '%d' 0x$(openssl rand -hex 2)) * (max - min + 1) / 65025))
+# 	local min=$1 max=$2
+# 	echo -n $((min + $(printf '%d' 0x$(openssl rand -hex 2)) * (max - min + 1) / 65025))
 # }
 
 
@@ -628,7 +628,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.7.1"
+version="3.7.2"
 useragent="$(curl -V | grep -Eo '^curl.+)') Skynet-Lite/$version https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/var/lock/skynet.lock"
 
@@ -662,13 +662,13 @@ done
 
 
 if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
-	for i in 1 2 3 4 5 6; do
+	for i in 1 2 3 4 5 6 7; do
 		if ping -q -w1 -c1 ibm.com >/dev/null 2>&1; then break; fi
 		if ping -q -w1 -c1 fastly.com >/dev/null 2>&1; then break; fi
 		if ping -q -w1 -c1 github.com >/dev/null 2>&1; then break; fi
 		if [ $i -eq 1 ]; then log_Skynet "[!] Waiting for internet connectivity..."; fi
-		if [ $i -eq 6 ]; then log_Skynet "[*] Internet connectivity error"; echo; exit 1; fi
-		sleep 9
+		if [ $i -eq 7 ]; then log_Skynet "[*] Internet connectivity error"; echo; exit 1; fi
+		sleep 10
 	done
 fi
 
@@ -713,6 +713,7 @@ case "$command" in
 		header "Reset"
 		log_Skynet "[i] Install"
 		cru d Skynet_update; minutes=$(($(date +%M) % 15))
+		cru a Skynet_update "$((minutes + 0)),$((minutes + 15)),$((minutes + 30)),$((minutes + 45)) * * * * nice -n 19 /jffs/scripts/firewall update cru"
 		rm -f "$dir_cache/"* "$dir_debug/"* "$dir_etag/"* "$dir_filtered/"*
 		rm -f "$dir_reload/"* "$dir_system/"* "$dir_temp/"* "$dir_update/"*
 		true > "$dir_skynet/warning.log"
@@ -746,7 +747,6 @@ case "$command" in
 		load_Blocklist
 		load_Domain
 		download_Set
-		cru a Skynet_update "$((minutes + 0)),$((minutes + 15)),$((minutes + 30)),$((minutes + 45)) * * * * nice -n 19 /jffs/scripts/firewall update cru"
 		update_Counter "$dir_system/updatecount" >/dev/null
 		footer
 	;;
@@ -909,4 +909,3 @@ esac
 rm -f "$dir_temp/"*
 log_Tail "$dir_skynet/warning.log"
 log_Tail "$dir_skynet/error.log"
-
