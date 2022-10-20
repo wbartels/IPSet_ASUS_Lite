@@ -56,15 +56,15 @@ loginvalid="disabled"	# enabled | disabled
 
 blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4}
 					<blocklist.de>			https://lists.blocklist.de/lists/all.txt  {1}
-					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {1}
+					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {4}
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
 					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {4}
 					<greensnow>				https://blocklist.greensnow.co/greensnow.txt  {1}
-					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {1}
-					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
-					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
-					<tor_exits>				https://check.torproject.org/exit-addresses  {4}
-					<tor_exits_fallback>	ZZZZZ://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst  {4}"
+					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
+					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {24}
+					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {24}
+					<stopforumspam_toxic>	https://www.stopforumspam.com/downloads/toxic_ip_cidr.txt  {96}
+					<tor_exits>				https://check.torproject.org/exit-addresses  {4}"
 blocklist_ip=""
 blocklist_domain=""
 
@@ -431,7 +431,7 @@ load_Passlist() {
 
 	response_code=$(curl -sf --location \
 		--limit-rate "$throttle" --user-agent "$useragent" \
-		--connect-timeout 5 --retry 3 --retry-max-time 60 \
+		--connect-timeout 10 --retry 2 --retry-max-time 60 \
 		--remote-time --time-cond "$cache" \
 		--etag-compare "$etag" --etag-save "$etag_temp" \
 		--write-out "%{response_code}" --output "$temp" \
@@ -552,7 +552,7 @@ download_Set() {
 
 		response_code=$(curl -sf --location \
 			--limit-rate "$throttle" --user-agent "$useragent" \
-			--connect-timeout 5 --retry 3 --retry-max-time 60 \
+			--connect-timeout 10 --retry 2 --retry-max-time 60 \
 			--remote-time --time-cond "$cache" \
 			--etag-compare "$etag" --etag-save "$etag_temp" \
 			--write-out "%{response_code}" --output "$temp" \
@@ -564,9 +564,8 @@ download_Set() {
 				log_Skynet "[i] Fresh $comment"
 			elif compare_Set && [ -s "$cache" ]; then
 				log_Skynet "[!] Redownload $comment"
-				mv -f "$temp" "$cache"
-				mv -f "$filtered_temp" "$filtered_cache"
-				mv -f "$etag_temp" "$etag"
+			elif [ $(wc -l < "$filtered_temp") -eq 0 ]; then
+				log_Skynet "[!] Ignore update $comment (zero entries)"
 			else
 				log_Skynet "[i] Update $comment"
 				load_Set
@@ -627,7 +626,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.8.0"
+version="3.8.1"
 useragent="$(curl -V | grep -Eo '^curl.+)') Skynet-Lite/$version https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/var/lock/skynet.lock"
 
