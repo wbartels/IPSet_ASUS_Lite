@@ -59,11 +59,11 @@ blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4
 					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {4}
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
 					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {4}
-					<greensnow>				https://blocklist.greensnow.co/greensnow.txt  {1}
-					<myip>					https://www.myip.ms/files/blacklist/csf/latest_blacklist.txt  {4}
+					<greensnow>				ZZZZZ://blocklist.greensnow.co/greensnow.txt  {1}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {24}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {24}
-					<stopforumspam_toxic>	https://www.stopforumspam.com/downloads/toxic_ip_cidr.txt  {96}
+					<stopforumspam>			https://www.stopforumspam.com/downloads/listed_ip_7.zip  {1}
+					<stopforumspam_toxic>	https://www.stopforumspam.com/downloads/toxic_ip_cidr.txt  {48}
 					<tor_exits>				https://check.torproject.org/exit-addresses  {4}"
 blocklist_ip=""
 blocklist_domain=""
@@ -84,9 +84,9 @@ passlist_domain="	dns.adguard.com
 
 
 unload_IPTables() {
-	iptables -t raw -D PREROUTING -i "$iface" -m set ! --match-set Skynet-Passlist src -m set --match-set Skynet-Primary src -j DROP 2>/dev/null
-	iptables -t raw -D PREROUTING -i br+ -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j DROP 2>/dev/null
-	iptables -t raw -D OUTPUT -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j DROP 2>/dev/null
+	iptables -t raw -D PREROUTING -i "$iface" -m set ! --match-set Skynet-Passlist src -m set --match-set Skynet-Master src -j DROP 2>/dev/null
+	iptables -t raw -D PREROUTING -i br+ -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Master dst -j DROP 2>/dev/null
+	iptables -t raw -D OUTPUT -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Master dst -j DROP 2>/dev/null
 	iptables -D logdrop -m state --state NEW -j LOG --log-prefix "DROP " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 	ip6tables -D logdrop -m state --state NEW -j LOG --log-prefix "DROP " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 	iptables -D logdrop -m state --state NEW -m limit --limit 4/sec -j LOG --log-prefix "DROP " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
@@ -96,19 +96,19 @@ unload_IPTables() {
 
 load_IPTables() {
 	if [ "$filtertraffic" = "all" ] || [ "$filtertraffic" = "inbound" ]; then
-		iptables -t raw -I PREROUTING -i "$iface" -m set ! --match-set Skynet-Passlist src -m set --match-set Skynet-Primary src -j DROP 2>/dev/null
+		iptables -t raw -I PREROUTING -i "$iface" -m set ! --match-set Skynet-Passlist src -m set --match-set Skynet-Master src -j DROP 2>/dev/null
 	fi
 	if [ "$filtertraffic" = "all" ] || [ "$filtertraffic" = "outbound" ]; then
-		iptables -t raw -I PREROUTING -i br+ -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j DROP 2>/dev/null
-		iptables -t raw -I OUTPUT -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j DROP 2>/dev/null
+		iptables -t raw -I PREROUTING -i br+ -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Master dst -j DROP 2>/dev/null
+		iptables -t raw -I OUTPUT -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Master dst -j DROP 2>/dev/null
 	fi
 }
 
 
 unload_LogIPTables() {
-	iptables -t raw -D PREROUTING -i "$iface" -m set ! --match-set Skynet-Passlist src -m set --match-set Skynet-Primary src -j LOG --log-prefix "[BLOCKED - INBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
-	iptables -t raw -D PREROUTING -i br+ -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
-	iptables -t raw -D OUTPUT -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+	iptables -t raw -D PREROUTING -i "$iface" -m set ! --match-set Skynet-Passlist src -m set --match-set Skynet-Master src -j LOG --log-prefix "[BLOCKED - INBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+	iptables -t raw -D PREROUTING -i br+ -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+	iptables -t raw -D OUTPUT -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 	iptables -D logdrop -m state --state NEW -j LOG --log-prefix "[BLOCKED - INVALID] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 	iptables -D FORWARD -i br+ -m set --match-set Skynet-IOT src ! -o tun2+ -j LOG --log-prefix "[BLOCKED - IOT] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 }
@@ -118,14 +118,14 @@ load_LogIPTables() {
 	local pos2= pos3= pos4= pos5=
 	if [ "$logmode" = "enabled" ]; then
 		if [ "$filtertraffic" = "all" ] || [ "$filtertraffic" = "inbound" ]; then
-			pos2="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Primary src" | grep -F "DROP" | awk '{print $1}')"
-			iptables -t raw -I PREROUTING "$pos2" -i "$iface" -m set ! --match-set Skynet-Passlist src -m set --match-set Skynet-Primary src -j LOG --log-prefix "[BLOCKED - INBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+			pos2="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Master src" | grep -F "DROP" | awk '{print $1}')"
+			iptables -t raw -I PREROUTING "$pos2" -i "$iface" -m set ! --match-set Skynet-Passlist src -m set --match-set Skynet-Master src -j LOG --log-prefix "[BLOCKED - INBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 		fi
 		if [ "$filtertraffic" = "all" ] || [ "$filtertraffic" = "outbound" ]; then
-			pos3="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Primary dst" | grep -F "DROP" | awk '{print $1}')"
-			iptables -t raw -I PREROUTING "$pos3" -i br+ -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
-			pos4="$(iptables --line -nL OUTPUT -t raw | grep -F "Skynet-Primary dst" | grep -F "DROP" | awk '{print $1}')"
-			iptables -t raw -I OUTPUT "$pos4" -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Primary dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+			pos3="$(iptables --line -nL PREROUTING -t raw | grep -F "Skynet-Master dst" | grep -F "DROP" | awk '{print $1}')"
+			iptables -t raw -I PREROUTING "$pos3" -i br+ -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
+			pos4="$(iptables --line -nL OUTPUT -t raw | grep -F "Skynet-Master dst" | grep -F "DROP" | awk '{print $1}')"
+			iptables -t raw -I OUTPUT "$pos4" -m set ! --match-set Skynet-Passlist dst -m set --match-set Skynet-Master dst -j LOG --log-prefix "[BLOCKED - OUTBOUND] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
 		fi
 		if [ "$(nvram get fw_log_x)" = "drop" ] || [ "$(nvram get fw_log_x)" = "both" ] && [ "$loginvalid" = "enabled" ]; then
 			iptables -I logdrop -m state --state NEW -j LOG --log-prefix "[BLOCKED - INVALID] " --log-tcp-sequence --log-tcp-options --log-ip-options 2>/dev/null
@@ -139,7 +139,7 @@ load_LogIPTables() {
 
 
 unload_IPSets() {
-	ipset -q destroy Skynet-Primary
+	ipset -q destroy Skynet-Master
 	ipset -n list | filter_Skynet | xargs -I setname ipset -q destroy setname
 }
 
@@ -431,7 +431,7 @@ load_Passlist() {
 
 	response_code=$(curl -sf --location \
 		--limit-rate "$throttle" --user-agent "$useragent" \
-		--connect-timeout 10 --retry 2 --retry-max-time 60 \
+		--connect-timeout 5 --retry 2 --retry-max-time 30 \
 		--remote-time --time-cond "$cache" \
 		--etag-compare "$etag" --etag-save "$etag_temp" \
 		--write-out "%{response_code}" --output "$temp" \
@@ -507,7 +507,7 @@ compare_Set() {
 	if [ ! -f "$filtered_cache" ]; then
 		touch "$filtered_cache"
 	fi
-	{ gunzip -c "$temp" 2>/dev/null || cat "$temp"; } | filter_IP_CIDR | filter_Out_PrivateIP | sort -u > "$filtered_temp"
+	{ unzip -p "$temp" 2>/dev/null || gunzip -c "$temp" 2>/dev/null || cat "$temp"; } | filter_IP_CIDR | filter_Out_PrivateIP | sort -u > "$filtered_temp"
 	diff "$filtered_cache" "$filtered_temp" > "$dir_temp/diff"; local diff_exit=$?
 	printf '\033[1A\033[K' # cursor up and clear
 	return $diff_exit
@@ -527,7 +527,7 @@ download_Set() {
 
 		if ! ipset -n list "$setname" >/dev/null 2>&1; then
 			ipset create "$setname" hash:net maxelem 524288 comment
-			ipset add Skynet-Primary "$setname" comment "$comment"
+			ipset add Skynet-Master "$setname" comment "$comment"
 		fi
 		if [ -f "$dir_reload/$setname" ]; then
 			if [ $(head -1 "$dir_reload/$setname" 2>/dev/null) -ge 27 ]; then
@@ -552,7 +552,7 @@ download_Set() {
 
 		response_code=$(curl -sf --location \
 			--limit-rate "$throttle" --user-agent "$useragent" \
-			--connect-timeout 10 --retry 2 --retry-max-time 60 \
+			--connect-timeout 5 --retry 2 --retry-max-time 30 \
 			--remote-time --time-cond "$cache" \
 			--etag-compare "$etag" --etag-save "$etag_temp" \
 			--write-out "%{response_code}" --output "$temp" \
@@ -589,9 +589,9 @@ download_Set() {
 	if hash_Unmodified "$blocklist_set" "blocklist_set"; then return; fi
 	# Unload unlisted sets
 	list=$(filter_Skynet_Set < "$dir_system/lookup.csv" | awk -F, '{print $1}')
-	for setname in $(ipset list Skynet-Primary | filter_Skynet_Set | awk '{print $1}'); do
+	for setname in $(ipset list Skynet-Master | filter_Skynet_Set | awk '{print $1}'); do
 		if ! echo "$list" | grep -q "$setname"; then
-			ipset -q del "Skynet-Primary" "$setname"
+			ipset -q del "Skynet-Master" "$setname"
 			ipset -q destroy "$setname"
 		fi
 	done
@@ -626,7 +626,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.8.1"
+version="3.8.2"
 useragent="$(curl -V | grep -Eo '^curl.+)') Skynet-Lite/$version https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/var/lock/skynet.lock"
 
@@ -643,10 +643,20 @@ mkdir -p "$dir_cache" "$dir_debug" "$dir_etag" "$dir_filtered"
 mkdir -p "$dir_reload" "$dir_system" "$dir_temp" "$dir_update"
 
 
-domain=$(echo "$command" | is_Domain) && command="domain"
-ip=$(echo "$command" | is_IP) && command="ip"
+exec 99>"$lockfile"
+if ! flock -n 99; then
+	if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
+		log_Skynet "[!] Skynet Lite is locked, next update scheduled"
+		exit 1;
+	fi
+	printf '\n\033[1A' # newline and cursor up
+	printf '[i] Skynet Lite is locked, retry command every 5 seconds...'
+	sleep 5
+	exec "$0" "$command"
+fi
 
-if ! ipset list -n Skynet-Primary >/dev/null 2>&1; then
+
+if ! ipset list -n Skynet-Master >/dev/null 2>&1; then
 	command="reset"
 	option=""
 fi
@@ -672,19 +682,6 @@ if [ "$command" = "update" ] || [ "$command" = "reset" ]; then
 fi
 
 
-exec 99>"$lockfile"
-if ! flock -n 99; then
-	if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
-		log_Skynet "[!] Skynet Lite is locked, next update scheduled"
-		exit 1;
-	fi
-	printf '\n\033[1A' # newline and cursor up
-	printf '[i] Skynet Lite is locked, retry command every 5 seconds...'
-	sleep 5
-	exec "$0" "$command"
-fi
-
-
 if [ "$command" = "update" ] && [ "$option" = "cru" ]; then
 	throttle="5M"
 	updatecount=$(update_Counter "$dir_system/updatecount")
@@ -707,6 +704,8 @@ unset i
 #######################
 
 
+domain=$(echo "$command" | is_Domain) && command="domain"
+ip=$(echo "$command" | is_IP) && command="ip"
 case "$command" in
 	reset)
 		header "Reset"
@@ -732,11 +731,11 @@ case "$command" in
 		unload_LogIPTables
 		unload_IPSets
 		echo 'create Skynet-Passlist hash:net comment
-			create Skynet-Primary list:set size 64 comment counters
+			create Skynet-Master list:set size 64 comment counters
 			create Skynet-Blocklist hash:net comment
 			create Skynet-Domain hash:net comment
-			add Skynet-Primary Skynet-Blocklist comment "blocklist_ip"
-			add Skynet-Primary Skynet-Domain comment "blocklist_domain"' | tr -d '\t' | ipset restore -!
+			add Skynet-Master Skynet-Blocklist comment "blocklist_ip"
+			add Skynet-Master Skynet-Domain comment "blocklist_domain"' | tr -d '\t' | ipset restore -!
 		load_IPTables
 		load_LogIPTables
 		lookup_Comment_Init
@@ -744,7 +743,7 @@ case "$command" in
 		load_Blocklist
 		load_Domain
 		download_Set
-		cru d Skynet_update; minutes=$(($(date +%M) % 15))
+		cru d Skynet_update; minutes=$(( ($(date +%M) + 14) % 15))
 		cru a Skynet_update "$((minutes + 0)),$((minutes + 15)),$((minutes + 30)),$((minutes + 45)) * * * * nice -n 19 /jffs/scripts/firewall update cru"
 		update_Counter "$dir_system/updatecount" >/dev/null
 		footer
@@ -896,7 +895,7 @@ case "$command" in
 	*)
 		header "Blocklist" "Packets blocked"
 		true > "$dir_temp/file.ssv" # semicolon separated value
-		ipset list Skynet-Primary | filter_Skynet | awk '{print $1 "," $3}' | while IFS=, read -r setname blocked; do
+		ipset list Skynet-Master | filter_Skynet | awk '{print $1 "," $3}' | while IFS=, read -r setname blocked; do
 			echo "$(lookup_Comment "$setname");$blocked;$(formatted_Number $blocked)" >> "$dir_temp/file.ssv"
 		done
 		sort -t';' -k2nr -k1,1 < "$dir_temp/file.ssv" | awk -F';' '{printf " %-40s  %15s\n", $1, $3}'
