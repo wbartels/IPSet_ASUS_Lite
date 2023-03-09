@@ -59,7 +59,7 @@ blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4
 					<ciarmy>				https://cinsscore.com/list/ci-badguys.txt  {4}
 					<cleantalk>				https://iplists.firehol.org/files/cleantalk_7d.ipset  {4}
 					<dshield>				https://iplists.firehol.org/files/dshield_7d.netset  {4}
-					<greensnow>				ZZZZZ://blocklist.greensnow.co/greensnow.txt  {1}
+					<greensnow>				https://blocklist.greensnow.co/greensnow.txt  {1}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {24}
 					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {24}
 					<stopforumspam>			https://www.stopforumspam.com/downloads/listed_ip_7.zip  {1}
@@ -626,7 +626,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.8.2"
+version="3.8.3"
 useragent="$(curl -V | grep -Eo '^curl.+)') Skynet-Lite/$version https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/var/lock/skynet.lock"
 
