@@ -26,7 +26,7 @@ Administration > System > Enable JFFS custom scripts and configs: Yes > Apply
 Type the following line in your favorite SSH Client:
 
 ```Shell
-curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && /jffs/scripts/firewall
+curl https://raw.githubusercontent.com/wbartels/IPSet_ASUS_Lite/master/firewall.sh --output /jffs/scripts/firewall && chmod 755 /jffs/scripts/firewall && /jffs/scripts/firewall reset
 ```
 
 ## Uninstall
@@ -46,6 +46,7 @@ firewall dns.google
 firewall fresh
 firewall frequency
 firewall entries
+firewall debug
 firewall warning
 firewall error
 firewall update
