@@ -61,7 +61,6 @@ blocklist_set="		<binarydefense>			https://www.binarydefense.com/banlist.txt  {4
 					<dshield>				https://feeds.dshield.org/block.txt  {4}
 					<greensnow>				https://blocklist.greensnow.co/greensnow.txt  {1}
 					<spamhaus_drop>			https://www.spamhaus.org/drop/drop.txt  {12}
-					<spamhaus_edrop>		https://www.spamhaus.org/drop/edrop.txt  {12}
 					<stopforumspam>			https://www.stopforumspam.com/downloads/listed_ip_7.zip  {1}
 					<stopforumspam_toxic>	https://www.stopforumspam.com/downloads/toxic_ip_cidr.txt  {96}
 					<tor_exits>				https://check.torproject.org/exit-addresses  {4}"
@@ -635,7 +634,7 @@ option="$2"
 throttle=0
 updatecount=0
 iotblocked="disabled"
-version="3.8.4"
+version="3.8.5"
 useragent="$(curl -V | grep -Eo '^curl.+)') Skynet-Lite/$version https://github.com/wbartels/IPSet_ASUS_Lite"
 lockfile="/var/lock/skynet.lock"
 
